@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+*.log
+.env
+.env.*
+!.env.example
+pnpm-lock.yaml
+.DS_Store
+bin/
+qdrant_storage/
+storage/
+*.tsbuildinfo
