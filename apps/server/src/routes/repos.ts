@@ -1,13 +1,58 @@
+import { spawn } from "node:child_process";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import * as db from "../db.js";
-import { cloneAndListFiles, cleanupTempDir, isValidGitHubUrl } from "@archai/repo-parser";
-import { indexRepo } from "@archai/indexer";
+import { isValidGitHubUrl } from "@archai/repo-parser";
+import { deleteRepoVectors } from "@archai/indexer";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import type { RepoStatusResponse } from "@archai/types";
 
-export function createReposRouter(openai: OpenAI, qdrant: QdrantClient): Router {
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** Run indexing in a separate process so a crash does not take down the server. */
+function runIndexingWorker(repoId: string): void {
+  const serverRoot = join(__dirname, "..", "..");
+  const isDist = __dirname.includes(join("", "dist", ""));
+  const workerPath = join(__dirname, "..", isDist ? "worker.js" : "worker.ts");
+
+  const child = isDist
+    ? spawn(process.execPath, [workerPath, repoId], { env: process.env, cwd: serverRoot, stdio: "inherit" })
+    : spawn("npx", ["tsx", workerPath, repoId], { env: process.env, cwd: serverRoot, stdio: "inherit" });
+
+  child.on("error", (err) => {
+    console.error("[repos] worker spawn error", repoId, err);
+  });
+  child.on("exit", (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.log("[repos] worker exited", { repoId, code, signal });
+    }
+  });
+}
+
+export function createReposRouter(_openai: OpenAI, qdrant: QdrantClient): Router {
   const router = Router();
+
+  // GET /api/repos — list all repos (must be before /:id)
+  router.get("/", async (_req, res, next) => {
+    try {
+      const repos = await db.listRepos();
+      res.json(
+        repos.map((r) => ({
+          id: r.id,
+          github_url: r.github_url,
+          name: r.name,
+          status: r.status,
+          error_message: r.error_message,
+          files_processed: r.files_processed,
+          created_at: r.created_at,
+        }))
+      );
+    } catch (e) {
+      next(e);
+    }
+  });
 
   // POST /api/repos
   router.post("/", async (req, res, next) => {
@@ -24,35 +69,11 @@ export function createReposRouter(openai: OpenAI, qdrant: QdrantClient): Router 
       const name = url.replace(/\.git$/, "").split("/").pop() ?? "repo";
       const defaultBranch = "main";
       const repo = await db.createRepo(url.trim().replace(/\.git$/, ""), name, defaultBranch);
+      console.log("[repos] created repo", { id: repo.id, github_url: repo.github_url, status: repo.status });
       res.status(202).json({ repoId: repo.id, status: repo.status });
 
-      // Run indexing inline (async after response)
-      let basePath: string | undefined;
-      try {
-        await db.setRepoStatus(repo.id, "indexing");
-        const { basePath: path, files } = await cloneAndListFiles(repo.github_url);
-        basePath = path;
-        await indexRepo(
-          repo.id,
-          path,
-          files,
-          openai,
-          qdrant,
-          (n) => void db.setRepoStatus(repo.id, "indexing", null, n)
-        );
-        await db.setRepoStatus(repo.id, "ready", null, files.length);
-      } catch (err) {
-        console.error("[indexing failed]", repo.id, err);
-        let message = err instanceof Error ? err.message : "Indexing failed.";
-        if (message === "fetch failed" && err instanceof Error && "cause" in err) {
-          const cause = (err as Error & { cause?: Error }).cause?.message;
-          if (cause) message = `Network error: ${cause}. (Is Qdrant running at QDRANT_URL? Is OPENAI_API_KEY valid?)`;
-          else message = "Network error: request failed. Check that Qdrant is running (or QDRANT_URL is set) and OPENAI_API_KEY is valid.";
-        }
-        await db.setRepoStatus(repo.id, "failed", message);
-      } finally {
-        if (basePath) await cleanupTempDir(basePath).catch(() => {});
-      }
+      await db.setRepoStatus(repo.id, "indexing");
+      runIndexingWorker(repo.id);
     } catch (e) {
       next(e);
     }
@@ -61,7 +82,9 @@ export function createReposRouter(openai: OpenAI, qdrant: QdrantClient): Router 
   // GET /api/repos/:id
   router.get("/:id", async (req, res, next) => {
     try {
-      const repo = await db.getRepo(req.params.id!);
+      const id = req.params.id!;
+      const repo = await db.getRepo(id);
+      console.log("[repos] GET by id", { id, found: !!repo, status: repo?.status });
       if (!repo) {
         res.status(404).json({ error: "Repository not found." });
         return;
@@ -80,10 +103,28 @@ export function createReposRouter(openai: OpenAI, qdrant: QdrantClient): Router 
     }
   });
 
+  // GET /api/repos/:id/report — holistic overview (bullets) stored at index time
+  router.get("/:id/report", async (req, res, next) => {
+    try {
+      const id = req.params.id!;
+      const repo = await db.getRepo(id);
+      if (!repo) {
+        res.status(404).json({ error: "Repository not found." });
+        return;
+      }
+      const report = await db.getReport(id);
+      res.json(report ?? { overview: [] });
+    } catch (e) {
+      next(e);
+    }
+  });
+
   // GET /api/repos/:id/status
   router.get("/:id/status", async (req, res, next) => {
     try {
-      const repo = await db.getRepo(req.params.id!);
+      const id = req.params.id!;
+      const repo = await db.getRepo(id);
+      console.log("[repos] GET status by id", { id, found: !!repo, status: repo?.status });
       if (!repo) {
         res.status(404).json({ error: "Repository not found." });
         return;
@@ -94,6 +135,31 @@ export function createReposRouter(openai: OpenAI, qdrant: QdrantClient): Router 
         error_message: repo.error_message,
         files_processed: repo.files_processed,
       });
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // DELETE /api/repos/:id
+  router.delete("/:id", async (req, res, next) => {
+    try {
+      const id = req.params.id!;
+      const repo = await db.getRepo(id);
+      if (!repo) {
+        res.status(404).json({ error: "Repository not found." });
+        return;
+      }
+      try {
+        await deleteRepoVectors(qdrant, id);
+      } catch (e) {
+        console.warn("[repos] deleteRepoVectors failed (continuing)", id, e);
+      }
+      const deleted = await db.deleteRepo(id);
+      if (!deleted) {
+        res.status(404).json({ error: "Repository not found." });
+        return;
+      }
+      res.status(204).send();
     } catch (e) {
       next(e);
     }

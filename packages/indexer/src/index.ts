@@ -14,10 +14,21 @@ export async function indexRepo(
   qdrant: QdrantClient,
   onProgress?: ProgressCallback
 ): Promise<void> {
+  console.log("[indexer] step 1: ensureCollection (Qdrant)");
   await ensureCollection(qdrant);
+  console.log("[indexer] step 1 done");
+
+  console.log("[indexer] step 2: extractChunks (parse)");
   const chunks = await extractChunks(repoId, basePath, files, onProgress);
+  console.log("[indexer] step 2 done", { chunkCount: chunks.length });
+
+  console.log("[indexer] step 3: embedChunks (OpenAI)");
   const embeddings = await embedChunks(openai, chunks);
+  console.log("[indexer] step 3 done", { embeddingCount: embeddings.size });
+
+  console.log("[indexer] step 4: upsertChunks (Qdrant)");
   await upsertChunks(qdrant, repoId, chunks, embeddings);
+  console.log("[indexer] step 4 done");
 }
 
 export { extractChunks } from "./chunk.js";

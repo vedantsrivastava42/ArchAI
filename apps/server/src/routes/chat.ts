@@ -4,7 +4,34 @@ import { searchChunks } from "@archai/retriever";
 import { askOpenAI } from "@archai/llm";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
-import type { ChatRequest, ChatResponse } from "@archai/types";
+import type { ChatRequest, ChatResponse, RepoReport } from "@archai/types";
+
+const HOLISTIC_PHRASES = [
+  "what does this project do",
+  "what does it do",
+  "overview",
+  "main features",
+  "architecture",
+  "explain this project",
+  "describe this codebase",
+  "what is this repo",
+];
+
+export function isHolisticQuestion(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return HOLISTIC_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
+/** Flatten report sections into one bullet list for chat response */
+function reportToOverview(report: RepoReport): string[] {
+  const out: string[] = [];
+  if (report.purpose?.length) out.push(...report.purpose);
+  if (report.features?.length) out.push(...report.features);
+  if (report.keyApis?.length) out.push(...report.keyApis);
+  if (report.architecture?.length) out.push(...report.architecture);
+  if (report.overview?.length && out.length === 0) out.push(...report.overview);
+  return out;
+}
 
 export function createChatRouter(
   openai: OpenAI,
@@ -33,12 +60,29 @@ export function createChatRouter(
         res.status(400).json({ error: "Invalid request. Provide { message: string }." });
         return;
       }
+
+      if (isHolisticQuestion(message)) {
+        const report = await db.getReport(repoId);
+        const overview = report ? reportToOverview(report) : [];
+        const answer =
+          overview.length > 0
+            ? "Here's the project overview:\n\n" + overview.map((b) => `• ${b}`).join("\n")
+            : "No overview available yet. The report may still be generating.";
+        const response: ChatResponse = {
+          answer,
+          overview: overview.length > 0 ? overview : undefined,
+        };
+        res.json(response);
+        return;
+      }
+
       const history = Array.isArray(body.history) ? body.history : undefined;
       const chunks = await searchChunks(qdrant, openai, repoId, message, 5);
       const contextChunks = chunks.map((c) => ({
         filePath: c.filePath,
         content: c.content,
         symbolName: c.symbolName,
+        symbolType: c.symbolType,
       }));
       const { answer, references } = await askOpenAI(openai, message, contextChunks, history);
       const response: ChatResponse = { answer, references };

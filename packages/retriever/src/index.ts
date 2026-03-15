@@ -1,2 +1,2 @@
-export { searchChunks } from "./search.js";
-export type { SearchResult } from "./search.js";
+export { searchChunks, searchChunksHolistic, HOLISTIC_QUERIES } from "./search.js";
+export type { SearchResult, SearchChunksHolisticOptions } from "./search.js";

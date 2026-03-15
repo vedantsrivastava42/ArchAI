@@ -47,6 +47,8 @@ Built from [docs/plans](docs/plans): overview (00) through files summary (11).
   ```
   Keep it running; then start the API and web app. Alternatively use [Qdrant Cloud](https://cloud.qdrant.io) and set `QDRANT_URL` to your cluster URL.
 
+**Background indexing:** Indexing runs in a separate process (worker). If the worker crashes, the API server stays up; the repo status becomes "failed" and you can retry. To run the worker manually (e.g. to debug): from `apps/server`, run `npm run worker -- <repoId>`.
+
 1. **Create `.env`** (copy from `.env.example`) and set at least:
    - `DATABASE_URL` — from Neon/Supabase or your Postgres host
    - `QDRANT_URL` — from Qdrant Cloud or `http://localhost:6333` if running Qdrant locally

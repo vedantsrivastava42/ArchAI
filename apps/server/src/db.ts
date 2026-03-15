@@ -3,7 +3,7 @@ import dns from "node:dns";
 import { readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import type { Repo, RepoStatus } from "@archai/types";
+import type { Repo, RepoStatus, RepoReport } from "@archai/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -40,11 +40,12 @@ export async function initDb(): Promise<void> {
 }
 
 export async function runMigrations(): Promise<void> {
-  const sql = await readFile(
-    join(__dirname, "..", "migrations", "001_initial.sql"),
-    "utf-8"
-  );
-  await pool.query(sql);
+  const migrationsDir = join(__dirname, "..", "migrations");
+  const files = ["001_initial.sql", "002_report.sql"];
+  for (const file of files) {
+    const sql = await readFile(join(migrationsDir, file), "utf-8");
+    await pool.query(sql);
+  }
 }
 
 export interface RepoRow {
@@ -88,8 +89,40 @@ export async function createRepo(
 }
 
 export async function getRepo(id: string): Promise<Repo | null> {
+  console.log("[db] getRepo", { id, idLength: id?.length });
   const res = await pool.query<RepoRow>("SELECT * FROM repos WHERE id = $1", [id]);
+  const found = !!res.rows[0];
+  console.log("[db] getRepo result", { id, found });
   return res.rows[0] ? rowToRepo(res.rows[0]) : null;
+}
+
+export async function listRepos(): Promise<Repo[]> {
+  const res = await pool.query<RepoRow>(
+    "SELECT * FROM repos ORDER BY created_at DESC"
+  );
+  return res.rows.map(rowToRepo);
+}
+
+export async function deleteRepo(id: string): Promise<boolean> {
+  const res = await pool.query("DELETE FROM repos WHERE id = $1 RETURNING id", [id]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+export async function getReport(repoId: string): Promise<RepoReport | null> {
+  const res = await pool.query<{ report: unknown }>(
+    "SELECT report FROM repos WHERE id = $1",
+    [repoId]
+  );
+  const raw = res.rows[0]?.report;
+  if (raw == null || typeof raw !== "object") return null;
+  return raw as RepoReport;
+}
+
+export async function saveReport(repoId: string, report: RepoReport): Promise<void> {
+  await pool.query(
+    "UPDATE repos SET report = $2, updated_at = now() WHERE id = $1",
+    [repoId, JSON.stringify(report)]
+  );
 }
 
 export async function setRepoStatus(

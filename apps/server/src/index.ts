@@ -12,6 +12,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 config();
 
+// Log unhandled rejections and uncaught errors so we see what kills the process
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[process] unhandledRejection – this may crash the server", { reason, promise });
+  if (reason instanceof Error) console.error("[process] stack", reason.stack);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[process] uncaughtException – server may exit", err);
+  console.error("[process] stack", err.stack);
+});
+
 import express from "express";
 import cors from "cors";
 import { createReposRouter } from "./routes/repos.js";

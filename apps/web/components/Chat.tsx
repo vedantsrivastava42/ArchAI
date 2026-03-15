@@ -9,13 +9,20 @@ import {
   Group,
   Badge,
   Loader,
+  List,
 } from "@mantine/core";
 import { CodeHighlight } from "@mantine/code-highlight";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
-import type { ChatMessage, ChatResponse } from "@archai/types";
+import type { ChatResponse } from "@archai/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+  overview?: string[];
+}
 
 interface ChatProps {
   repoId: string;
@@ -23,7 +30,7 @@ interface ChatProps {
 
 export function Chat({ repoId }: ChatProps) {
   const [message, setMessage] = useState("");
-  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -32,7 +39,10 @@ export function Chat({ repoId }: ChatProps) {
       const res = await fetch(`${API_BASE}/api/repos/${repoId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({
+          message: text,
+          history: history.map((h) => ({ role: h.role, content: h.content })),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -44,7 +54,7 @@ export function Chat({ repoId }: ChatProps) {
       setHistory((prev) => [
         ...prev,
         { role: "user", content: text },
-        { role: "assistant", content: data.answer },
+        { role: "assistant", content: data.answer, overview: data.overview },
       ]);
       setMessage("");
       queryClient.invalidateQueries({ queryKey: ["repo", repoId] });
@@ -63,7 +73,7 @@ export function Chat({ repoId }: ChatProps) {
             <Paper p="md" withBorder>
               <Stack gap="xs">
                 <Badge variant="light">Tip</Badge>
-                Ask about the codebase: &quot;Where is X defined?&quot;, &quot;How does Y work?&quot;
+                Ask about the codebase: &quot;Where is X defined?&quot;, &quot;How does Y work?&quot; Or ask for an overview: &quot;What does this project do?&quot;
               </Stack>
             </Paper>
           )}
@@ -81,7 +91,11 @@ export function Chat({ repoId }: ChatProps) {
                 <Badge size="sm" color={m.role === "user" ? "blue" : "gray"}>
                   {m.role}
                 </Badge>
-                <MessageContent content={m.content} />
+                {m.overview?.length ? (
+                  <MessageContent content={m.content} overview={m.overview} />
+                ) : (
+                  <MessageContent content={m.content} />
+                )}
               </Stack>
             </Paper>
           ))}
@@ -118,7 +132,18 @@ export function Chat({ repoId }: ChatProps) {
   );
 }
 
-function MessageContent({ content }: { content: string }) {
+function MessageContent({ content, overview }: { content: string; overview?: string[] }) {
+  if (overview?.length) {
+    return (
+      <Stack gap="xs">
+        <List size="sm" spacing="xs">
+          {overview.map((item, i) => (
+            <List.Item key={i}>{item}</List.Item>
+          ))}
+        </List>
+      </Stack>
+    );
+  }
   const parts = content.split(/(```[\s\S]*?```)/g);
   return (
     <>

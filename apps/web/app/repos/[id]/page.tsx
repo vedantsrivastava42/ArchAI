@@ -19,6 +19,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Chat } from "../../../components/Chat";
+import { ReportView } from "../../../components/ReportView";
+import { ApisView } from "../../../components/ApisView";
+import { DetailedReportView } from "../../../components/DetailedReportView";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -27,14 +30,21 @@ function useRepo(id: string | undefined) {
     queryKey: ["repo", id],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/repos/${id}`);
-      if (!res.ok) throw new Error("Not found");
-      return res.json() as Promise<{
+      console.log("[useRepo] fetch", { id, status: res.status, ok: res.ok });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.log("[useRepo] fetch error", { id, status: res.status, body });
+        throw new Error("Not found");
+      }
+      const data = (await res.json()) as {
         id: string;
         name: string;
         status: string;
         error_message: string | null;
         files_processed: number;
-      }>;
+      };
+      console.log("[useRepo] fetch ok", { id, status: data?.status, error_message: data?.error_message });
+      return data;
     },
     enabled: !!id,
     refetchInterval: (query) => {
@@ -49,10 +59,18 @@ export default function RepoPage() {
   const id = params.id as string;
   const { data: repo, error, isLoading } = useRepo(id);
 
+  const isNetworkError =
+    error instanceof Error &&
+    (error.message === "Failed to fetch" || error.message === "Load failed" || (error as unknown as { cause?: { code?: string } })?.cause?.code === "ECONNREFUSED");
+
   if (error || (!isLoading && !repo)) {
     return (
       <Container py="xl">
-        <Alert color="red">Repository not found.</Alert>
+        <Alert color="red">
+          {isNetworkError
+            ? "Cannot reach the server. Make sure the backend is running (e.g. npm run dev in apps/server)."
+            : "Repository not found."}
+        </Alert>
         <Anchor component={Link} href="/" mt="md" display="inline-block">
           Back to Home
         </Anchor>
@@ -111,10 +129,46 @@ export default function RepoPage() {
             </Stack>
           </Card>
 
-          <Tabs defaultValue="chat">
+          <Tabs defaultValue="report">
             <Tabs.List>
+              <Tabs.Tab value="report">Report</Tabs.Tab>
+              <Tabs.Tab value="apis">APIs</Tabs.Tab>
+              <Tabs.Tab value="detailed">Detailed analysis</Tabs.Tab>
               <Tabs.Tab value="chat">Chat</Tabs.Tab>
             </Tabs.List>
+            <Tabs.Panel value="report" pt="md">
+              {isReady ? (
+                <ReportView repoId={id} />
+              ) : (
+                <Alert color="blue">
+                  {isIndexing
+                    ? "Indexing in progress. Report will be available when ready."
+                    : "Complete indexing to see the report."}
+                </Alert>
+              )}
+            </Tabs.Panel>
+            <Tabs.Panel value="apis" pt="md">
+              {isReady ? (
+                <ApisView repoId={id} />
+              ) : (
+                <Alert color="blue">
+                  {isIndexing
+                    ? "Indexing in progress. APIs will be available when ready."
+                    : "Complete indexing to see APIs."}
+                </Alert>
+              )}
+            </Tabs.Panel>
+            <Tabs.Panel value="detailed" pt="md">
+              {isReady ? (
+                <DetailedReportView repoId={id} />
+              ) : (
+                <Alert color="blue">
+                  {isIndexing
+                    ? "Indexing in progress. Detailed analysis will be available when ready."
+                    : "Complete indexing to see the detailed analysis."}
+                </Alert>
+              )}
+            </Tabs.Panel>
             <Tabs.Panel value="chat" pt="md">
               {isReady ? (
                 <Chat repoId={id} />

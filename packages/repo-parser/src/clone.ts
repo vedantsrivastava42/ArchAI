@@ -35,14 +35,47 @@ export function isValidGitHubUrl(url: string): boolean {
  * Caller is responsible for cleaning up temp dir after indexing.
  */
 export async function cloneAndListFiles(
-  url: string
+  url: string,
+  debugLog?: (step: string, detail?: Record<string, unknown>) => void
 ): Promise<{ basePath: string; files: string[] }> {
+  const log = debugLog ?? (() => {});
+
   const normalized = url.trim().replace(/\.git$/, "");
+  log("clone_step_1_normalize", { url: normalized });
+
+  log("clone_step_2_tempdir", {});
   const tempDir = await mkdtemp(join(tmpdir(), "archai-"));
+  log("clone_step_2_done", { tempDir });
+
   const git = simpleGit({ baseDir: tempDir });
-  await git.clone(normalized, tempDir, ["--depth", "1"]);
+  // Capture git stderr so we can log it if clone fails
+  let gitStderr = "";
+  git.outputHandler((_cmd, _stdout, stderr) => {
+    stderr?.on("data", (chunk: Buffer) => {
+      gitStderr += chunk.toString();
+    });
+  });
+
+  log("clone_step_3_clone_start", { url: normalized, tempDir });
+  try {
+    await git.clone(normalized, tempDir, ["--depth", "1"]);
+  } catch (err) {
+    log("clone_step_3_clone_failed", {
+      message: err instanceof Error ? err.message : String(err),
+      gitStderr: gitStderr || "(no stderr captured)",
+    });
+    throw err;
+  }
+  log("clone_step_3_clone_done", {});
+
+  log("clone_step_4_walk_start", {});
   const allFiles = await walkDir(tempDir);
+  log("clone_step_4_walk_done", { fileCount: allFiles.length });
+
+  log("clone_step_5_filter_start", {});
   const files = filterFiles(allFiles);
+  log("clone_step_5_filter_done", { filteredCount: files.length });
+
   return { basePath: tempDir, files };
 }
 
