@@ -18,6 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { IconArrowLeft } from "@tabler/icons-react";
 import { Chat } from "../../../components/Chat";
 import { ReportView } from "../../../components/ReportView";
 import { ApisView } from "../../../components/ApisView";
@@ -30,28 +31,44 @@ function useRepo(id: string | undefined) {
     queryKey: ["repo", id],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/repos/${id}`);
-      console.log("[useRepo] fetch", { id, status: res.status, ok: res.ok });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        console.log("[useRepo] fetch error", { id, status: res.status, body });
-        throw new Error("Not found");
+        throw new Error(body.error ?? "Not found");
       }
-      const data = (await res.json()) as {
+      return res.json() as Promise<{
         id: string;
         name: string;
         status: string;
         error_message: string | null;
         files_processed: number;
-      };
-      console.log("[useRepo] fetch ok", { id, status: data?.status, error_message: data?.error_message });
-      return data;
+      }>;
     },
     enabled: !!id,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === "indexing" ? 2500 : false;
-    },
+    refetchInterval: (query) =>
+      query.state.data?.status === "indexing" ? 2500 : false,
   });
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const isReady = status === "ready";
+  const isFailed = status === "failed";
+  const pillStyle: React.CSSProperties = {
+    background: isReady
+      ? "linear-gradient(135deg, #10b981, #059669)"
+      : isFailed
+        ? "linear-gradient(135deg, #ef4444, #dc2626)"
+        : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "9999px",
+    padding: "4px 14px",
+    fontSize: 12,
+    fontWeight: 600,
+    boxShadow: "0 0 20px rgba(124, 58, 237, 0.35)",
+  };
+  if (isFailed) (pillStyle as Record<string, string>).boxShadow = "0 0 16px rgba(239, 68, 68, 0.4)";
+  if (isReady) (pillStyle as Record<string, string>).boxShadow = "0 0 16px rgba(16, 185, 129, 0.35)";
+  return <Badge variant="filled" style={pillStyle}>{status.toUpperCase()}</Badge>;
 }
 
 export default function RepoPage() {
@@ -61,17 +78,27 @@ export default function RepoPage() {
 
   const isNetworkError =
     error instanceof Error &&
-    (error.message === "Failed to fetch" || error.message === "Load failed" || (error as unknown as { cause?: { code?: string } })?.cause?.code === "ECONNREFUSED");
+    (error.message === "Failed to fetch" ||
+      error.message === "Load failed" ||
+      (error as unknown as { cause?: { code?: string } })?.cause?.code === "ECONNREFUSED");
 
   if (error || (!isLoading && !repo)) {
     return (
-      <Container py="xl">
-        <Alert color="red">
+      <Container size="lg" py="xl">
+        <Alert color="red" variant="light" radius="md">
           {isNetworkError
             ? "Cannot reach the server. Make sure the backend is running (e.g. npm run dev in apps/server)."
             : "Repository not found."}
         </Alert>
-        <Anchor component={Link} href="/" mt="md" display="inline-block">
+        <Anchor
+          component={Link}
+          href="/"
+          mt="md"
+          display="inline-flex"
+          size="sm"
+          style={{ alignItems: "center", gap: 6 }}
+        >
+          <IconArrowLeft size={16} />
           Back to Home
         </Anchor>
       </Container>
@@ -80,10 +107,12 @@ export default function RepoPage() {
 
   if (isLoading || !repo) {
     return (
-      <Container py="xl">
-        <Group>
-          <Loader size="sm" />
-          <Text>Loading repository…</Text>
+      <Container size="lg" py="xl">
+        <Group gap="sm">
+          <Loader size="sm" color="violet" />
+          <Text size="sm" c="dimmed">
+            Loading repository…
+          </Text>
         </Group>
       </Container>
     );
@@ -94,86 +123,125 @@ export default function RepoPage() {
   const isFailed = repo.status === "failed";
 
   return (
-    <AppShell
-      header={{ height: 56 }}
-      padding="md"
-    >
-      <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group>
-            <Anchor component={Link} href="/" size="sm">
-              Home
+    <AppShell header={{ height: 64 }} padding="md">
+      <AppShell.Header
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          backdropFilter: "blur(10px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <Group h="100%" px="lg" justify="space-between" wrap="nowrap">
+          <Group gap="lg" wrap="nowrap" style={{ minWidth: 0 }}>
+            <Anchor
+              component={Link}
+              href="/"
+              size="sm"
+              className="archai-gradient-text"
+              style={{ fontSize: 18, fontWeight: 700, textDecoration: "none" }}
+            >
+              ArchAI
             </Anchor>
-            <Title order={4}>{repo.name}</Title>
+            <Title order={4} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {repo.name}
+            </Title>
           </Group>
-          <Badge color={isReady ? "green" : isFailed ? "red" : "blue"}>{repo.status}</Badge>
+          <StatusBadge status={repo.status} />
         </Group>
       </AppShell.Header>
       <AppShell.Main>
-        <Container size="lg">
-          <Card withBorder mb="md">
-            <Stack gap="xs">
+        <Container size="lg" py="xl">
+          <Card
+            className="archai-glass"
+            p="lg"
+            mb="xl"
+            radius="md"
+            style={{ padding: 24 }}
+          >
+            <Stack gap="md">
               <Group justify="space-between">
-                <Text size="sm" c="dimmed">Status</Text>
-                <Badge color={isReady ? "green" : isFailed ? "red" : "blue"}>{repo.status}</Badge>
+                <Text size="sm" fw={600} c="dimmed">
+                  Status
+                </Text>
+                <StatusBadge status={repo.status} />
               </Group>
               {isIndexing && (
-                <Progress value={repo.files_processed ? 50 : 10} size="sm" animated />
+                <Progress
+                  value={repo.files_processed ? 50 : 10}
+                  size="sm"
+                  radius="xl"
+                  animated
+                  color="violet"
+                  style={{ background: "rgba(255,255,255,0.08)" }}
+                />
               )}
               {isFailed && repo.error_message && (
-                <Alert color="red">{repo.error_message}</Alert>
+                <Alert color="red" variant="light" radius="md">
+                  {repo.error_message}
+                </Alert>
               )}
               {repo.files_processed > 0 && (
-                <Text size="sm" c="dimmed">Files processed: {repo.files_processed}</Text>
+                <Text size="sm" c="dimmed">
+                  Files processed: {repo.files_processed}
+                </Text>
               )}
             </Stack>
           </Card>
 
-          <Tabs defaultValue="report">
-            <Tabs.List>
+          <Tabs
+            defaultValue="report"
+            classNames={{
+              list: "archai-tabs-list",
+              tab: "archai-tab",
+            }}
+            styles={{
+              panel: { paddingTop: 24 },
+            }}
+          >
+            <Tabs.List grow style={{ maxWidth: 560 }}>
               <Tabs.Tab value="report">Report</Tabs.Tab>
               <Tabs.Tab value="apis">APIs</Tabs.Tab>
-              <Tabs.Tab value="detailed">Detailed analysis</Tabs.Tab>
+              <Tabs.Tab value="detailed">Detailed</Tabs.Tab>
               <Tabs.Tab value="chat">Chat</Tabs.Tab>
             </Tabs.List>
-            <Tabs.Panel value="report" pt="md">
+            <Tabs.Panel value="report">
               {isReady ? (
                 <ReportView repoId={id} />
               ) : (
-                <Alert color="blue">
+                <Alert color="violet" variant="light" radius="md">
                   {isIndexing
                     ? "Indexing in progress. Report will be available when ready."
                     : "Complete indexing to see the report."}
                 </Alert>
               )}
             </Tabs.Panel>
-            <Tabs.Panel value="apis" pt="md">
+            <Tabs.Panel value="apis">
               {isReady ? (
                 <ApisView repoId={id} />
               ) : (
-                <Alert color="blue">
+                <Alert color="violet" variant="light" radius="md">
                   {isIndexing
                     ? "Indexing in progress. APIs will be available when ready."
                     : "Complete indexing to see APIs."}
                 </Alert>
               )}
             </Tabs.Panel>
-            <Tabs.Panel value="detailed" pt="md">
+            <Tabs.Panel value="detailed">
               {isReady ? (
                 <DetailedReportView repoId={id} />
               ) : (
-                <Alert color="blue">
+                <Alert color="violet" variant="light" radius="md">
                   {isIndexing
                     ? "Indexing in progress. Detailed analysis will be available when ready."
                     : "Complete indexing to see the detailed analysis."}
                 </Alert>
               )}
             </Tabs.Panel>
-            <Tabs.Panel value="chat" pt="md">
+            <Tabs.Panel value="chat">
               {isReady ? (
                 <Chat repoId={id} />
               ) : (
-                <Alert color="blue">
+                <Alert color="violet" variant="light" radius="md">
                   {isIndexing
                     ? "Indexing in progress. Chat will be available when ready."
                     : "Complete indexing to start chatting."}

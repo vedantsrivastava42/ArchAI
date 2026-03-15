@@ -19,7 +19,9 @@ function displayType(chunk: ContextChunk): string {
 }
 
 export function buildSystemPrompt(): string {
-  return `You are an expert software engineer analyzing a codebase. Use only the provided context to answer. Explain clearly and reference file paths.`;
+  return `You are an expert software engineer analyzing a codebase. Use only the provided context to answer. Explain clearly and reference file paths.
+
+Format answers with markdown: use **bold** for API names, file paths, and key terms; use \`code\` for identifiers and routes.`;
 }
 
 export function buildHolisticSystemPrompt(): string {
@@ -40,7 +42,9 @@ Structure your response with these sections (use markdown headers and bullets):
 ## Architecture
 - (how components are structured and interact, key technologies)
 
-Do not invent features not visible in the code. Use only what the snippets show.`;
+Do not invent features not visible in the code. Use only what the snippets show.
+
+Use **bold** for API names, key concepts, and route paths in bullet text.`;
 }
 
 /** Prompt for deep technical report (10 sections, paragraph-style). */
@@ -49,7 +53,7 @@ export function buildDetailedReportSystemPrompt(): string {
 
 Analyze the repository and explain the system. Do not give generic summaries. Explain based only on the provided code.
 
-Structure your response with exactly these markdown sections (use ## and the exact titles). Write full paragraphs, not bullets:
+Structure your response with exactly these markdown sections (use ## and the exact titles). Write full paragraphs, not bullets. Use **bold** for key terms, API names, route paths (e.g. **POST /api/...**), and important concepts within each section so they stand out:
 
 ## 1. Project Overview
 Explain what the system actually is.

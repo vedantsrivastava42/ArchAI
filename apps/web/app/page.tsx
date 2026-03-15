@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import { IconArrowRight } from "@tabler/icons-react";
 import { RepoForm } from "../components/RepoForm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -40,6 +41,10 @@ function useRepos() {
       return res.json() as Promise<RepoItem[]>;
     },
   });
+}
+
+function statusColor(status: string): string {
+  return status === "ready" ? "green" : status === "failed" ? "red" : "violet";
 }
 
 export default function Home() {
@@ -83,15 +88,28 @@ export default function Home() {
     },
   });
 
-  const statusColor = (status: string) =>
-    status === "ready" ? "green" : status === "failed" ? "red" : "blue";
-
   return (
-    <Container size="md" py="xl">
-      <Stack gap="lg">
-        <Title order={1}>ArchAI</Title>
-        <Text c="dimmed">Analyze a GitHub repository with AI. Paste the repo URL to start.</Text>
-        <Paper p="md" withBorder>
+    <Container size="lg" py={48}>
+      <Stack gap="xl">
+        <header>
+          <Title
+            order={1}
+            className="archai-gradient-text"
+            style={{ fontSize: "clamp(2rem, 5vw, 3rem)", marginBottom: 8 }}
+          >
+            ArchAI
+          </Title>
+          <Text size="lg" c="dimmed" style={{ maxWidth: 480, lineHeight: 1.6 }}>
+            Analyze a GitHub repository with AI. Paste the repo URL to start.
+          </Text>
+        </header>
+
+        <Paper
+          className="archai-glass"
+          p="lg"
+          radius="md"
+          style={{ padding: 24 }}
+        >
           <RepoForm
             value={url}
             onChange={setUrl}
@@ -101,59 +119,94 @@ export default function Home() {
           />
         </Paper>
 
-        <Title order={3} mt="md">
-          Your repositories
-        </Title>
-        {reposLoading ? (
-          <Group>
-            <Loader size="sm" />
-            <Text size="sm" c="dimmed">Loading repos…</Text>
-          </Group>
-        ) : repos.length === 0 ? (
-          <Text size="sm" c="dimmed">No repositories yet. Add one above.</Text>
-        ) : (
-          <Stack gap="sm">
-            {repos.map((repo) => (
-              <Card key={repo.id} withBorder padding="sm" radius="md">
-                <Group justify="space-between" wrap="nowrap">
-                  <Group wrap="nowrap" style={{ minWidth: 0 }}>
-                    <Anchor
-                      component={Link}
-                      href={`/repos/${repo.id}`}
-                      size="sm"
-                      fw={500}
-                      style={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      {repo.name}
-                    </Anchor>
-                    <Badge size="sm" color={statusColor(repo.status)} variant="light">
-                      {repo.status}
-                    </Badge>
-                    {repo.files_processed > 0 && (
-                      <Text size="xs" c="dimmed">
-                        {repo.files_processed} files
-                      </Text>
-                    )}
+        <section style={{ marginTop: 40 }}>
+          <Title order={3} mb="md">
+            Your repositories
+          </Title>
+          {reposLoading ? (
+            <Group gap="sm">
+              <Loader size="sm" color="violet" />
+              <Text size="sm" c="dimmed">
+                Loading repos…
+              </Text>
+            </Group>
+          ) : repos.length === 0 ? (
+            <Text size="sm" c="dimmed">
+              No repositories yet. Add one above.
+            </Text>
+          ) : (
+            <Stack gap="md">
+              {repos.map((repo) => (
+                <Card
+                  key={repo.id}
+                  className="archai-glass"
+                  padding="lg"
+                  radius="md"
+                  style={{ padding: 24 }}
+                >
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group wrap="nowrap" style={{ minWidth: 0 }} gap="md">
+                      <Anchor
+                        component={Link}
+                        href={`/repos/${repo.id}`}
+                        size="sm"
+                        fw={600}
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {repo.name}
+                      </Anchor>
+                      <Badge
+                        size="sm"
+                        color={statusColor(repo.status)}
+                        variant="light"
+                        radius="xl"
+                      >
+                        {repo.status}
+                      </Badge>
+                      {repo.files_processed > 0 && (
+                        <Text size="xs" c="dimmed">
+                          {repo.files_processed} files
+                        </Text>
+                      )}
+                    </Group>
+                    <Group gap="xs">
+                      <Button
+                        component={Link}
+                        href={`/repos/${repo.id}`}
+                        size="xs"
+                        variant="light"
+                        color="violet"
+                        rightSection={<IconArrowRight size={14} />}
+                        className="archai-btn-glow"
+                      >
+                        Open
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="red"
+                        variant="light"
+                        loading={
+                          deleteRepo.isPending && deleteRepo.variables === repo.id
+                        }
+                        onClick={() => deleteRepo.mutate(repo.id)}
+                      >
+                        Delete
+                      </Button>
+                    </Group>
                   </Group>
-                  <Button
-                    size="xs"
-                    color="red"
-                    variant="light"
-                    loading={deleteRepo.isPending && deleteRepo.variables === repo.id}
-                    onClick={() => deleteRepo.mutate(repo.id)}
-                  >
-                    Delete
-                  </Button>
-                </Group>
-                {repo.error_message && (
-                  <Text size="xs" c="red" mt={4}>
-                    {repo.error_message}
-                  </Text>
-                )}
-              </Card>
-            ))}
-          </Stack>
-        )}
+                  {repo.error_message && (
+                    <Text size="xs" c="red" mt="xs">
+                      {repo.error_message}
+                    </Text>
+                  )}
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </section>
       </Stack>
     </Container>
   );

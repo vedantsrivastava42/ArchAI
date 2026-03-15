@@ -21,7 +21,7 @@ export function RepoForm({ value, onChange, onSubmit, loading, error }: RepoForm
           onChange={(e) => onChange(e.currentTarget.value)}
           style={{ flex: 1 }}
         />
-        <Button onClick={onSubmit} loading={loading}>
+        <Button onClick={onSubmit} loading={loading} color="violet" className="archai-btn-glow">
           Analyze
         </Button>
       </Group>

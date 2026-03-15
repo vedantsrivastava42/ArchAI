@@ -1,7 +1,24 @@
 "use client";
 
-import { Stack, Title, Text, List, Loader, Group, Paper } from "@mantine/core";
+import {
+  Stack,
+  Title,
+  Text,
+  Loader,
+  Group,
+  Card,
+  Grid,
+  ThemeIcon,
+  Box,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import {
+  IconTarget,
+  IconSparkles,
+  IconPlug,
+  IconHierarchy2,
+  IconList,
+} from "@tabler/icons-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -13,17 +30,90 @@ interface RepoReport {
   overview?: string[];
 }
 
-function BulletSection({ title, items }: { title: string; items: string[] }) {
+const SECTION_CONFIG: Array<{
+  key: keyof RepoReport;
+  title: string;
+  icon: React.ElementType;
+  color: string;
+}> = [
+  { key: "purpose", title: "Purpose", icon: IconTarget, color: "violet" },
+  { key: "features", title: "Features", icon: IconSparkles, color: "indigo" },
+  { key: "keyApis", title: "Key APIs / Interfaces", icon: IconPlug, color: "blue" },
+  { key: "architecture", title: "Architecture", icon: IconHierarchy2, color: "cyan" },
+];
+
+function SectionCard({
+  title,
+  icon: Icon,
+  color,
+  items,
+}: {
+  title: string;
+  icon: React.ElementType;
+  color: string;
+  items: string[];
+}) {
   if (!items?.length) return null;
   return (
-    <Stack gap="xs">
-      <Title order={5}>{title}</Title>
-      <List size="sm" spacing="xs">
-        {items.map((item, i) => (
-          <List.Item key={i}>{item}</List.Item>
-        ))}
-      </List>
-    </Stack>
+    <Card
+      className="archai-glass"
+      p="lg"
+      radius="md"
+      component="section"
+      style={{ padding: 24 }}
+    >
+      <Stack gap="md">
+        <Group gap="sm">
+          <ThemeIcon size="lg" radius="md" variant="light" color={color}>
+            <Icon size={20} />
+          </ThemeIcon>
+          <Title order={4}>{title}</Title>
+        </Group>
+        <Stack gap="xs">
+          {items.map((item, i) => (
+            <Group key={i} gap="sm" wrap="nowrap" align="flex-start">
+              <Box
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "var(--archai-gradient)",
+                  flexShrink: 0,
+                  marginTop: 8,
+                }}
+              />
+              <Text size="sm" style={{ lineHeight: 1.6 }}>
+                {item}
+              </Text>
+            </Group>
+          ))}
+        </Stack>
+      </Stack>
+    </Card>
+  );
+}
+
+function FeatureCard({ text }: { text: string }) {
+  const [title, ...rest] = text.split(/[:–-]/);
+  const description = rest.join(":").trim() || null;
+  return (
+    <Card
+      className="archai-glass"
+      p="md"
+      radius="md"
+      style={{ padding: 20 }}
+    >
+      <Stack gap={4}>
+        <Text size="sm" fw={600}>
+          {title?.trim() || text}
+        </Text>
+        {description && (
+          <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+            {description}
+          </Text>
+        )}
+      </Stack>
+    </Card>
   );
 }
 
@@ -44,16 +134,20 @@ export function ReportView({ repoId }: ReportViewProps) {
 
   if (isLoading) {
     return (
-      <Group>
-        <Loader size="sm" />
-        <Text size="sm" c="dimmed">Loading report…</Text>
+      <Group gap="sm">
+        <Loader size="sm" color="violet" />
+        <Text size="sm" c="dimmed">
+          Loading report…
+        </Text>
       </Group>
     );
   }
 
   if (error || !report) {
     return (
-      <Text size="sm" c="dimmed">No report available. It may still be generating after indexing.</Text>
+      <Text size="sm" c="dimmed">
+        No report available. It may still be generating after indexing.
+      </Text>
     );
   }
 
@@ -67,21 +161,50 @@ export function ReportView({ repoId }: ReportViewProps) {
 
   if (!hasAny) {
     return (
-      <Text size="sm" c="dimmed">No report content yet. Try again after indexing completes.</Text>
+      <Text size="sm" c="dimmed">
+        No report content yet. Try again after indexing completes.
+      </Text>
     );
   }
 
+  const useOverview =
+    report.overview?.length &&
+    !report.purpose?.length &&
+    !report.features?.length;
+
   return (
-    <Paper p="md" withBorder>
-      <Stack gap="lg">
-        <BulletSection title="Purpose" items={report.purpose ?? []} />
-        <BulletSection title="Features" items={report.features ?? []} />
-        <BulletSection title="Key APIs / Interfaces" items={report.keyApis ?? []} />
-        <BulletSection title="Architecture" items={report.architecture ?? []} />
-        {report.overview?.length && !report.purpose?.length && !report.features?.length ? (
-          <BulletSection title="Overview" items={report.overview} />
-        ) : null}
-      </Stack>
-    </Paper>
+    <Stack gap="xl" style={{ marginTop: 40 }}>
+      {SECTION_CONFIG.map(({ key, title, icon, color }) => (
+        <SectionCard
+          key={key}
+          title={title}
+          icon={icon}
+          color={color}
+          items={(report[key] as string[]) ?? []}
+        />
+      ))}
+      {useOverview && (
+        <SectionCard
+          title="Overview"
+          icon={IconList}
+          color="gray"
+          items={report.overview ?? []}
+        />
+      )}
+      {(report.features?.length ?? 0) > 0 && (
+        <>
+          <Title order={3} mt="md">
+            Feature breakdown
+          </Title>
+          <Grid gutter="md">
+            {(report.features ?? []).map((item, i) => (
+              <Grid.Col key={i} span={{ base: 12, sm: 6 }}>
+                <FeatureCard text={item} />
+              </Grid.Col>
+            ))}
+          </Grid>
+        </>
+      )}
+    </Stack>
   );
 }

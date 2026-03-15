@@ -2,6 +2,7 @@ import { ColorSchemeScript, mantineHtmlProps } from "@mantine/core";
 import { Providers } from "./Providers";
 import "@mantine/core/styles.css";
 import "@mantine/code-highlight/styles.css";
+import "./globals.css";
 
 export const metadata = {
   title: "ArchAI",
