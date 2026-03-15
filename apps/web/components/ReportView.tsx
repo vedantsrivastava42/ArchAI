@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   Stack,
   Title,
@@ -21,6 +22,35 @@ import {
 } from "@tabler/icons-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+/** Parse **bold** in bullet text and return React nodes (bold segments rendered, asterisks removed) */
+function renderBulletWithBold(item: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let s = item;
+  let key = 0;
+  while (s.length > 0) {
+    const open = s.indexOf("**");
+    if (open === -1) {
+      parts.push(s);
+      break;
+    }
+    if (open > 0) parts.push(s.slice(0, open));
+    const afterOpen = s.slice(open + 2);
+    const close = afterOpen.indexOf("**");
+    if (close === -1) {
+      parts.push(s.slice(open));
+      break;
+    }
+    const boldText = afterOpen.slice(0, close);
+    parts.push(
+      <Text key={key++} component="span" fw={700} inherit>
+        {boldText}
+      </Text>
+    );
+    s = afterOpen.slice(close + 2);
+  }
+  return <>{parts}</>;
+}
 
 interface RepoReport {
   purpose?: string[];
@@ -83,7 +113,7 @@ function SectionCard({
                 }}
               />
               <Text size="sm" style={{ lineHeight: 1.6 }}>
-                {item}
+                {renderBulletWithBold(item)}
               </Text>
             </Group>
           ))}
@@ -105,11 +135,11 @@ function FeatureCard({ text }: { text: string }) {
     >
       <Stack gap={4}>
         <Text size="sm" fw={600}>
-          {title?.trim() || text}
+          {renderBulletWithBold(title?.trim() || text)}
         </Text>
         {description && (
           <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
-            {description}
+            {renderBulletWithBold(description)}
           </Text>
         )}
       </Stack>

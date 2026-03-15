@@ -83,6 +83,67 @@ export interface ApiRoute {
   path: string;
 }
 
+/** Per-category score and optional detected/missing items for Project Intelligence Report */
+export interface IntelligenceBreakdownItem {
+  score: number;
+  max: number;
+  detected?: string[];
+  missing?: string[];
+}
+
+/** Confidence level for advanced feature detection (integration verification) */
+export type FeatureConfidence = "signal" | "partial" | "full";
+
+/** Evidence for a single advanced feature (dependency + import + usage) */
+export interface FeatureEvidenceItem {
+  name: string;
+  confidence: FeatureConfidence;
+  evidence: {
+    dependency?: string;
+    import?: string[];
+    usage?: string[];
+  };
+}
+
+/** Project tier from total score */
+export type ProjectIntelligenceTier =
+  | "Production Ready"
+  | "Advanced Project"
+  | "Intermediate Project"
+  | "Basic Project";
+
+/** Project Intelligence Report: scores, breakdown, scalability, domain, suggestions */
+export interface ProjectIntelligenceReport {
+  totalScore: number;
+  tier: ProjectIntelligenceTier;
+  breakdown: {
+    architecture: IntelligenceBreakdownItem;
+    backendApis: IntelligenceBreakdownItem;
+    dataModeling: IntelligenceBreakdownItem;
+    devOps: IntelligenceBreakdownItem;
+    advancedFeatures: IntelligenceBreakdownItem;
+    aiIntegrations: IntelligenceBreakdownItem;
+    codebaseScale: IntelligenceBreakdownItem;
+  };
+  scale: {
+    apiCount: number;
+    moduleCount: number;
+    modelCount: number;
+  };
+  scalabilityEstimate?: string;
+  scalabilityReasoning?: string;
+  scalingRecommendations?: string[];
+  scalingTechnologies?: string[];
+  domain?: string;
+  domainSuggestions?: string[];
+  strengths?: string[];
+  suggestedNextFeatures?: string[];
+  /** Per-feature confidence and evidence for Advanced Features (integration verification) */
+  advancedFeaturesEvidence?: FeatureEvidenceItem[];
+  /** High engineering effort features detected (e.g. Redis caching, Message queue, Modular architecture) */
+  effortIndicators?: string[];
+}
+
 /** LLM-categorized group of APIs by feature (e.g. Course, Profile, Payment) */
 export interface ApiRouteGroup {
   feature: string;
@@ -103,4 +164,6 @@ export interface RepoReport {
   apiRoutes?: ApiRoute[];
   /** Routes grouped by feature via LLM (for APIs tab when present) */
   apiRoutesByFeature?: ApiRouteGroup[];
+  /** Project Intelligence Report (score, breakdown, scalability, domain, suggestions) */
+  intelligence?: ProjectIntelligenceReport;
 }

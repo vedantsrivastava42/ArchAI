@@ -23,6 +23,7 @@ import { Chat } from "../../../components/Chat";
 import { ReportView } from "../../../components/ReportView";
 import { ApisView } from "../../../components/ApisView";
 import { DetailedReportView } from "../../../components/DetailedReportView";
+import { IntelligenceView } from "../../../components/IntelligenceView";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -198,10 +199,11 @@ export default function RepoPage() {
               panel: { paddingTop: 24 },
             }}
           >
-            <Tabs.List grow style={{ maxWidth: 560 }}>
+            <Tabs.List grow style={{ maxWidth: 640 }}>
               <Tabs.Tab value="report">Report</Tabs.Tab>
               <Tabs.Tab value="apis">APIs</Tabs.Tab>
               <Tabs.Tab value="detailed">Detailed</Tabs.Tab>
+              <Tabs.Tab value="intelligence">Intelligence</Tabs.Tab>
               <Tabs.Tab value="chat">Chat</Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="report">
@@ -234,6 +236,17 @@ export default function RepoPage() {
                   {isIndexing
                     ? "Indexing in progress. Detailed analysis will be available when ready."
                     : "Complete indexing to see the detailed analysis."}
+                </Alert>
+              )}
+            </Tabs.Panel>
+            <Tabs.Panel value="intelligence">
+              {isReady ? (
+                <IntelligenceView repoId={id} />
+              ) : (
+                <Alert color="violet" variant="light" radius="md">
+                  {isIndexing
+                    ? "Indexing in progress. Intelligence report will be available when ready."
+                    : "Complete indexing to see the Project Intelligence report."}
                 </Alert>
               )}
             </Tabs.Panel>
