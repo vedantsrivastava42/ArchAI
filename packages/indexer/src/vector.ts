@@ -3,6 +3,7 @@ import type { Chunk } from "@archai/types";
 
 const COLLECTION = "codebase_chunks";
 const VECTOR_SIZE = 3072;
+const UPSERT_BATCH_SIZE = 100;
 
 export async function ensureCollection(client: QdrantClient): Promise<void> {
   const collections = await client.getCollections();
@@ -38,10 +39,13 @@ export async function upsertChunks(
       },
     }));
   if (points.length === 0) return;
-  await client.upsert(COLLECTION, {
-    wait: true,
-    points,
-  });
+  for (let i = 0; i < points.length; i += UPSERT_BATCH_SIZE) {
+    const batch = points.slice(i, i + UPSERT_BATCH_SIZE);
+    await client.upsert(COLLECTION, {
+      wait: true,
+      points: batch,
+    });
+  }
 }
 
 export async function deleteRepoVectors(client: QdrantClient, repoId: string): Promise<void> {

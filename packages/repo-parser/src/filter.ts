@@ -16,7 +16,18 @@ const IGNORE_SEGMENTS = new Set([
 ]);
 
 const IGNORE_EXTENSIONS = new Set([".log", ".lock"]);
-const IGNORE_NAMES = new Set([".env", ".env.local", ".env.production"]);
+const IGNORE_NAMES = new Set([
+  ".env",
+  ".env.local",
+  ".env.production",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "Cargo.lock",
+  "composer.lock",
+  "Gemfile.lock",
+  "poetry.lock",
+]);
 
 const ALLOWED_EXTENSIONS = new Set([
   ".ts",
@@ -26,6 +37,7 @@ const ALLOWED_EXTENSIONS = new Set([
   ".java",
   ".py",
   ".go",
+  ".rb",
 ]);
 
 export const MAX_FILES_PER_REPO = 2000;

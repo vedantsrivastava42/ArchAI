@@ -83,6 +83,12 @@ export interface ApiRoute {
   path: string;
 }
 
+/** LLM-categorized group of APIs by feature (e.g. Course, Profile, Payment) */
+export interface ApiRouteGroup {
+  feature: string;
+  routes: ApiRoute[];
+}
+
 /** Stored in repos.report after index-time holistic pipeline (bullets only) */
 export interface RepoReport {
   purpose?: string[];
@@ -95,4 +101,6 @@ export interface RepoReport {
   detailed?: DetailedReport;
   /** Extracted routes from code (for APIs tab and count) */
   apiRoutes?: ApiRoute[];
+  /** Routes grouped by feature via LLM (for APIs tab when present) */
+  apiRoutesByFeature?: ApiRouteGroup[];
 }

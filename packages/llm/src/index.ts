@@ -1,5 +1,6 @@
 export { askOpenAI } from "./openai.js";
 export type { LLMResult, AskOpenAIOptions } from "./openai.js";
+export { categorizeApiRoutes } from "./api-categorize.js";
 export {
   buildSystemPrompt,
   buildHolisticSystemPrompt,

@@ -15,8 +15,9 @@ export async function extractChunks(
     try {
       const chunks = await parseFile(file, basePath, repoId);
       allChunks.push(...chunks);
-    } catch {
-      // Skip unsupported or unparseable files
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[indexer] skip file", { file, reason: message });
     }
     processed += 1;
     onProgress?.(processed);

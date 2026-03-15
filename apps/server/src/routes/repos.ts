@@ -1,35 +1,11 @@
-import { spawn } from "node:child_process";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import * as db from "../db.js";
+import { addIndexRepoJob } from "../queue.js";
 import { isValidGitHubUrl } from "@archai/repo-parser";
 import { deleteRepoVectors } from "@archai/indexer";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import type { RepoStatusResponse } from "@archai/types";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-/** Run indexing in a separate process so a crash does not take down the server. */
-function runIndexingWorker(repoId: string): void {
-  const serverRoot = join(__dirname, "..", "..");
-  const isDist = __dirname.includes(join("", "dist", ""));
-  const workerPath = join(__dirname, "..", isDist ? "worker.js" : "worker.ts");
-
-  const child = isDist
-    ? spawn(process.execPath, [workerPath, repoId], { env: process.env, cwd: serverRoot, stdio: "inherit" })
-    : spawn("npx", ["tsx", workerPath, repoId], { env: process.env, cwd: serverRoot, stdio: "inherit" });
-
-  child.on("error", (err) => {
-    console.error("[repos] worker spawn error", repoId, err);
-  });
-  child.on("exit", (code, signal) => {
-    if (code !== 0 && code !== null) {
-      console.log("[repos] worker exited", { repoId, code, signal });
-    }
-  });
-}
 
 export function createReposRouter(_openai: OpenAI, qdrant: QdrantClient): Router {
   const router = Router();
@@ -72,8 +48,7 @@ export function createReposRouter(_openai: OpenAI, qdrant: QdrantClient): Router
       console.log("[repos] created repo", { id: repo.id, github_url: repo.github_url, status: repo.status });
       res.status(202).json({ repoId: repo.id, status: repo.status });
 
-      await db.setRepoStatus(repo.id, "indexing");
-      runIndexingWorker(repo.id);
+      await addIndexRepoJob(repo.id);
     } catch (e) {
       next(e);
     }
