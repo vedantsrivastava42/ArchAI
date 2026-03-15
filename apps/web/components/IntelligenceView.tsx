@@ -93,27 +93,86 @@ const BREAKDOWN_LABELS: Array<{
   { key: "codebaseScale", label: "Codebase Scale", icon: IconChartPie, color: "orange" },
 ];
 
-function ScoreCircle({ score, max, tier }: { score: number; max: number; tier: string }) {
+const RYG = ["#ef4444", "#f97316", "#eab308", "#22c55e"];
+
+const PIE_ANIMATION_STYLES = `
+  @keyframes archai-score-reveal {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .archai-score-ring-wrapper {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                filter 0.35s ease,
+                box-shadow 0.35s ease;
+  }
+  .archai-score-ring-wrapper:hover {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 20px var(--archai-ring-glow));
+    box-shadow: 0 0 32px var(--archai-ring-glow);
+  }
+`;
+
+export function ScoreCircle({ score, max, tier }: { score: number; max: number; tier: string }) {
   const pct = max ? (score / max) * 100 : 0;
+  const color = RYG[Math.min(3, (pct / 25) | 0)];
+  const c = 2 * Math.PI * 45;
+  const dash = (pct / 100) * c;
   return (
-    <Card
-      className="archai-glass"
-      p="xl"
-      radius="md"
-      style={{ padding: 32, textAlign: "center" }}
-    >
+    <Stack gap="md" style={{ padding: 32 }}>
+      <style>{PIE_ANIMATION_STYLES}</style>
       <Stack align="center" gap="md">
         <Box
-          style={{
-            width: 140,
-            height: 140,
-            borderRadius: "50%",
-            background: `conic-gradient(rgba(124, 58, 237, 0.9) 0deg ${pct * 3.6}deg, rgba(255,255,255,0.08) ${pct * 3.6}deg 360deg)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          className="archai-score-ring-wrapper"
+          style={
+            {
+              "--archai-ring-glow": `${color}66`,
+              width: 140,
+              height: 140,
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              animation: "archai-score-reveal 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+              filter: `drop-shadow(0 0 12px ${color}99) drop-shadow(0 0 24px ${color}44)`,
+            } as React.CSSProperties
+          }
         >
+          <svg
+            width={140}
+            height={140}
+            viewBox="0 0 100 100"
+            style={{
+              position: "absolute",
+              inset: 0,
+              transform: "rotate(-90deg)",
+              filter: `drop-shadow(0 0 8px ${color})`,
+            }}
+          >
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth="10"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke={color}
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${c}`}
+              strokeDashoffset="0"
+              style={{
+                transition: "stroke 0.6s ease, stroke-dasharray 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
+              }}
+            />
+          </svg>
           <Box
             style={{
               width: 110,
@@ -124,6 +183,9 @@ function ScoreCircle({ score, max, tier }: { score: number; max: number; tier: s
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              border: "1px solid rgba(255,255,255,0.06)",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             <Title order={2} className="archai-gradient-text" style={{ fontSize: 36, lineHeight: 1.2 }}>
@@ -134,25 +196,32 @@ function ScoreCircle({ score, max, tier }: { score: number; max: number; tier: s
             </Text>
           </Box>
         </Box>
-        <div>
+        <div style={{ textAlign: "center" }}>
           <Text size="lg" fw={600} c="dimmed">
-            Project Intelligence Score
+            Effort Analysis Score
           </Text>
           <Badge
-            variant="light"
             size="lg"
             mt="xs"
             style={{
-              background: "rgba(124, 58, 237, 0.2)",
-              color: "var(--mantine-color-violet-3)",
+              background: `${color}22`,
+              color,
               fontSize: 12,
+              transition: "background 0.5s ease, color 0.5s ease",
             }}
           >
             {tier}
           </Badge>
         </div>
       </Stack>
-    </Card>
+      <Text
+        size="xs"
+        c="red"
+        style={{ width: "100%", textAlign: "left", lineHeight: 1.4 }}
+      >
+        Note: The score reflects detectable engineering signals in the repository and should be interpreted as an indicative assessment rather than an exact measure of effort.
+      </Text>
+    </Stack>
   );
 }
 

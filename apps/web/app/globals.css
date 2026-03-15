@@ -50,11 +50,14 @@ body {
 
 /* Pill tabs */
 .archai-tabs-list {
+  --tabs-list-border-width: 0 !important;
   background: var(--archai-card) !important;
   padding: 4px !important;
   border-radius: 9999px !important;
-  border: 1px solid var(--archai-border) !important;
   gap: 4px !important;
+}
+.archai-tabs-list::before {
+  display: none;
 }
 .archai-tab {
   border-radius: 9999px !important;
