@@ -16,6 +16,7 @@ Built from [docs/plans](docs/plans): overview (00) through files summary (11).
 1. **Env**  
    Copy `.env.example` to `.env` and set:
    - `DATABASE_URL`, `QDRANT_URL` (see **No Docker** below)
+   - `REDIS_URL` (for indexing job queue; default `redis://localhost:6379` — run Redis e.g. `docker run -p 6379:6379 redis`)
    - `OPENAI_API_KEY` (used for embeddings and chat)  
    Optional: `GITHUB_TOKEN` for private repos, `PORT` for server (default 3001).
 
@@ -35,7 +36,9 @@ Built from [docs/plans](docs/plans): overview (00) through files summary (11).
    Or build all: `npm run build` (if your root script runs workspaces in order).
 
 4. **Run**  
+   - Redis (for indexing): `docker run -p 6379:6379 redis` (or use a hosted Redis; set `REDIS_URL`).
    - API: `npm run dev:server` (Express on PORT)
+   - Queue worker (indexing): from `apps/server`, run `npm run worker:queue` in a separate terminal. Without it, indexing jobs are enqueued but not processed.
    - Web: `npm run dev:web` (Next.js on 3000)  
    Set `NEXT_PUBLIC_API_URL=http://localhost:3001` if the API is on another host.
 
@@ -47,11 +50,12 @@ Built from [docs/plans](docs/plans): overview (00) through files summary (11).
   ```
   Keep it running; then start the API and web app. Alternatively use [Qdrant Cloud](https://cloud.qdrant.io) and set `QDRANT_URL` to your cluster URL.
 
-**Background indexing:** Indexing runs in a separate process (worker). If the worker crashes, the API server stays up; the repo status becomes "failed" and you can retry. To run the worker manually (e.g. to debug): from `apps/server`, run `npm run worker -- <repoId>`.
+**Background indexing:** Indexing uses a BullMQ job queue (Redis). Run the queue worker so jobs are processed: from `apps/server`, run `npm run worker:queue`. If the worker crashes, jobs are retried automatically; only after retries are exhausted does the repo status become "failed". For one-off indexing from the CLI: `npm run worker -- <repoId>`.
 
 1. **Create `.env`** (copy from `.env.example`) and set at least:
    - `DATABASE_URL` — from Neon/Supabase or your Postgres host
    - `QDRANT_URL` — from Qdrant Cloud or `http://localhost:6333` if running Qdrant locally
+   - `REDIS_URL` — `redis://localhost:6379` if running Redis locally (e.g. `docker run -p 6379:6379 redis`)
    - `OPENAI_API_KEY` — used for embeddings and chat (no other API keys needed)
 
 2. **Install and build** (from repo root):
@@ -66,12 +70,17 @@ Built from [docs/plans](docs/plans): overview (00) through files summary (11).
    npm run build -w web
    ```
 
-3. **Run backend and frontend** (two terminals):
+3. **Run Redis** (for indexing queue), then backend, queue worker, and frontend:
    ```bash
+   # Redis (if local): docker run -p 6379:6379 redis
+
    # Terminal 1 – API (default port 3001)
    npm run dev:server
 
-   # Terminal 2 – Next.js (port 3000)
+   # Terminal 2 – Queue worker (processes indexing jobs)
+   npm run worker:queue -w server
+
+   # Terminal 3 – Next.js (port 3000)
    npm run dev:web
    ```
 

@@ -27,6 +27,7 @@ import cors from "cors";
 import { createReposRouter } from "./routes/repos.js";
 import { createChatRouter } from "./routes/chat.js";
 import { initDb, runMigrations } from "./db.js";
+import { pingRedis } from "./queue.js";
 import { errorHandler } from "./middleware/errors.js";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
@@ -58,6 +59,15 @@ async function main() {
     console.log("Qdrant OK at", qdrantUrl);
   } catch (e) {
     console.warn("Qdrant not reachable at", qdrantUrl, "- indexing and chat will fail until it is running.");
+  }
+
+  try {
+    await pingRedis();
+    console.log("Redis OK (indexing queue ready)");
+  } catch (e) {
+    console.warn(
+      "Redis not reachable - indexing jobs will not be processed until Redis is running and the queue worker is started."
+    );
   }
 
   const app = express();

@@ -3,6 +3,8 @@
  * Or in dev: npx tsx src/worker.ts <repoId>
  * Uses same env as the server (DATABASE_URL, OPENAI_API_KEY, QDRANT_URL).
  * If this process crashes, the main server stays up.
+ *
+ * doIndexRepo(repoId) is also used by the BullMQ queue worker (worker-queue.ts).
  */
 import dns from "node:dns";
 import { config } from "dotenv";
@@ -23,27 +25,20 @@ import { askOpenAI, parseHolisticResponse, parseDetailedReportResponse } from "@
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 
-async function main(): Promise<void> {
-  const repoId = process.argv[2];
-  if (!repoId) {
-    console.error("[worker] usage: node dist/worker.js <repoId>");
-    process.exit(1);
-  }
-
-  const databaseUrl = process.env.DATABASE_URL;
-  const qdrantUrl = process.env.QDRANT_URL ?? "http://localhost:6333";
-  const openaiKey = process.env.OPENAI_API_KEY;
-
-  if (!databaseUrl || !openaiKey) {
-    console.error("[worker] Missing DATABASE_URL or OPENAI_API_KEY");
-    process.exit(1);
-  }
-
-  await db.initDb();
+/**
+ * Run the full indexing pipeline for a repo. Caller must have called db.initDb().
+ * Sets status to indexing → ready on success; on error sets failed and rethrows (for BullMQ retries).
+ */
+export async function doIndexRepo(repoId: string): Promise<void> {
   const repo = await db.getRepo(repoId);
   if (!repo) {
-    console.error("[worker] repo not found:", repoId);
-    process.exit(1);
+    throw new Error(`Repo not found: ${repoId}`);
+  }
+
+  const qdrantUrl = process.env.QDRANT_URL ?? "http://localhost:6333";
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    throw new Error("Missing OPENAI_API_KEY");
   }
 
   const openai = new OpenAI({ apiKey: openaiKey });
@@ -114,10 +109,35 @@ async function main(): Promise<void> {
     console.error("[worker] failed", repoId, err);
     const message = err instanceof Error ? err.message : "Indexing failed.";
     await db.setRepoStatus(repoId, "failed", message);
-    process.exit(1);
+    throw err;
   } finally {
     if (basePath) await cleanupTempDir(basePath).catch(() => {});
   }
 }
 
-main();
+async function main(): Promise<void> {
+  const repoId = process.argv[2];
+  if (!repoId) {
+    console.error("[worker] usage: node dist/worker.js <repoId>");
+    process.exit(1);
+  }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.error("[worker] Missing DATABASE_URL");
+    process.exit(1);
+  }
+
+  await db.initDb();
+  try {
+    await doIndexRepo(repoId);
+  } catch {
+    process.exit(1);
+  }
+}
+
+const isRunDirectly =
+  process.argv[1]?.endsWith("worker.js") || process.argv[1]?.endsWith("worker.ts");
+if (isRunDirectly) {
+  main();
+}
