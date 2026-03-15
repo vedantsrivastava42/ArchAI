@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect } from "react";
 import {
   Stack,
   Title,
@@ -10,6 +11,8 @@ import {
   Grid,
   ThemeIcon,
   Box,
+  Badge,
+  Alert,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,8 +22,60 @@ import {
   IconHierarchy2,
   IconList,
 } from "@tabler/icons-react";
+import { ScoreCircle } from "./IntelligenceView";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+function StatusBadge({ status }: { status: string }) {
+  const isReady = status === "ready";
+  const isFailed = status === "failed";
+  const pillStyle: React.CSSProperties = {
+    background: isReady
+      ? "linear-gradient(135deg, #10b981, #059669)"
+      : isFailed
+        ? "linear-gradient(135deg, #ef4444, #dc2626)"
+        : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "9999px",
+    padding: "4px 14px",
+    fontSize: 12,
+    fontWeight: 600,
+    boxShadow: "0 0 20px rgba(124, 58, 237, 0.35)",
+  };
+  if (isFailed) (pillStyle as Record<string, string>).boxShadow = "0 0 16px rgba(239, 68, 68, 0.4)";
+  if (isReady) (pillStyle as Record<string, string>).boxShadow = "0 0 16px rgba(16, 185, 129, 0.35)";
+  return <Badge variant="filled" style={pillStyle}>{status.toUpperCase()}</Badge>;
+}
+
+/** Parse **bold** in bullet text and return React nodes (bold segments rendered, asterisks removed) */
+function renderBulletWithBold(item: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let s = item;
+  let key = 0;
+  while (s.length > 0) {
+    const open = s.indexOf("**");
+    if (open === -1) {
+      parts.push(s);
+      break;
+    }
+    if (open > 0) parts.push(s.slice(0, open));
+    const afterOpen = s.slice(open + 2);
+    const close = afterOpen.indexOf("**");
+    if (close === -1) {
+      parts.push(s.slice(open));
+      break;
+    }
+    const boldText = afterOpen.slice(0, close);
+    parts.push(
+      <Text key={key++} component="span" fw={700} inherit>
+        {boldText}
+      </Text>
+    );
+    s = afterOpen.slice(close + 2);
+  }
+  return <>{parts}</>;
+}
 
 interface RepoReport {
   purpose?: string[];
@@ -28,6 +83,7 @@ interface RepoReport {
   keyApis?: string[];
   architecture?: string[];
   overview?: string[];
+  intelligence?: { totalScore: number; tier: string };
 }
 
 const SECTION_CONFIG: Array<{
@@ -83,7 +139,7 @@ function SectionCard({
                 }}
               />
               <Text size="sm" style={{ lineHeight: 1.6 }}>
-                {item}
+                {renderBulletWithBold(item)}
               </Text>
             </Group>
           ))}
@@ -105,11 +161,11 @@ function FeatureCard({ text }: { text: string }) {
     >
       <Stack gap={4}>
         <Text size="sm" fw={600}>
-          {title?.trim() || text}
+          {renderBulletWithBold(title?.trim() || text)}
         </Text>
         {description && (
           <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
-            {description}
+            {renderBulletWithBold(description)}
           </Text>
         )}
       </Stack>
@@ -119,10 +175,14 @@ function FeatureCard({ text }: { text: string }) {
 
 interface ReportViewProps {
   repoId: string;
+  repoStatus?: { status: string; files_processed: number; error_message: string | null };
 }
 
-export function ReportView({ repoId }: ReportViewProps) {
-  const { data: report, isLoading, error } = useQuery({
+export function ReportView({ repoId, repoStatus }: ReportViewProps) {
+  const isIndexing = repoStatus?.status === "indexing";
+  const isReady = repoStatus?.status === "ready";
+
+  const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ["report", repoId],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/repos/${repoId}/report`);
@@ -132,14 +192,36 @@ export function ReportView({ repoId }: ReportViewProps) {
     enabled: !!repoId,
   });
 
+  // When indexing finishes, refetch report so we show latest (including effort analysis) without refresh
+  useEffect(() => {
+    if (isReady) refetch();
+  }, [isReady, refetch]);
+
+  // While indexing: show only a loader until all 5 phases complete
+  if (repoStatus != null && isIndexing) {
+    return (
+      <Stack gap="md" align="center" justify="center" style={{ minHeight: 280, padding: 48 }}>
+        <Loader size="lg" color="violet" />
+        <Text size="sm" c="dimmed">
+          Preparing your report…
+        </Text>
+        {repoStatus.files_processed > 0 && (
+          <Text size="xs" c="dimmed">
+            Files processed: {repoStatus.files_processed}
+          </Text>
+        )}
+      </Stack>
+    );
+  }
+
   if (isLoading) {
     return (
-      <Group gap="sm">
-        <Loader size="sm" color="violet" />
+      <Stack gap="md" align="center" justify="center" style={{ minHeight: 280, padding: 48 }}>
+        <Loader size="lg" color="violet" />
         <Text size="sm" c="dimmed">
           Loading report…
         </Text>
-      </Group>
+      </Stack>
     );
   }
 
@@ -172,37 +254,80 @@ export function ReportView({ repoId }: ReportViewProps) {
     !report.purpose?.length &&
     !report.features?.length;
 
+  const intel = report.intelligence;
+  const isFailed = repoStatus?.status === "failed";
+  const showReportContent = repoStatus == null || isReady;
+
   return (
     <Stack gap="xl" style={{ marginTop: 40 }}>
-      {SECTION_CONFIG.map(({ key, title, icon, color }) => (
-        <SectionCard
-          key={key}
-          title={title}
-          icon={icon}
-          color={color}
-          items={(report[key] as string[]) ?? []}
-        />
-      ))}
-      {useOverview && (
-        <SectionCard
-          title="Overview"
-          icon={IconList}
-          color="gray"
-          items={report.overview ?? []}
-        />
+      {repoStatus != null && isReady && (
+        <Card
+          className="archai-glass"
+          p="lg"
+          radius="md"
+          style={{ padding: 24 }}
+        >
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Text size="sm" fw={600} c="dimmed">
+                Status
+              </Text>
+              <StatusBadge status={repoStatus.status} />
+            </Group>
+            {isFailed && repoStatus.error_message && (
+              <Alert color="red" variant="light" radius="md">
+                {repoStatus.error_message}
+              </Alert>
+            )}
+            {repoStatus.files_processed > 0 && (
+              <Text size="sm" c="dimmed">
+                Files processed: {repoStatus.files_processed}
+              </Text>
+            )}
+          </Stack>
+        </Card>
       )}
-      {(report.features?.length ?? 0) > 0 && (
+      {repoStatus != null && !isReady && !isIndexing && (
+        <Alert color="violet" variant="light" radius="md">
+          Complete indexing to see the report.
+        </Alert>
+      )}
+      {showReportContent && (
         <>
-          <Title order={3} mt="md">
-            Feature breakdown
-          </Title>
-          <Grid gutter="md">
-            {(report.features ?? []).map((item, i) => (
-              <Grid.Col key={i} span={{ base: 12, sm: 6 }}>
-                <FeatureCard text={item} />
-              </Grid.Col>
-            ))}
-          </Grid>
+          {intel != null && (
+            <ScoreCircle score={intel.totalScore} max={100} tier={intel.tier} />
+          )}
+          {SECTION_CONFIG.map(({ key, title, icon, color }) => (
+            <SectionCard
+              key={key}
+              title={title}
+              icon={icon}
+              color={color}
+              items={(report[key] as string[]) ?? []}
+            />
+          ))}
+          {useOverview && (
+            <SectionCard
+              title="Overview"
+              icon={IconList}
+              color="gray"
+              items={report.overview ?? []}
+            />
+          )}
+          {(report.features?.length ?? 0) > 0 && (
+            <>
+              <Title order={3} mt="md">
+                Feature breakdown
+              </Title>
+              <Grid gutter="md">
+                {(report.features ?? []).map((item, i) => (
+                  <Grid.Col key={i} span={{ base: 12, sm: 6 }}>
+                    <FeatureCard text={item} />
+                  </Grid.Col>
+                ))}
+              </Grid>
+            </>
+          )}
         </>
       )}
     </Stack>

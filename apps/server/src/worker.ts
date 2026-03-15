@@ -24,6 +24,7 @@ import { searchChunksHolistic } from "@archai/retriever";
 import { askOpenAI, parseHolisticResponse, parseDetailedReportResponse, categorizeApiRoutes } from "@archai/llm";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
+import { computeIntelligenceReport } from "./intelligence/index.js";
 
 /**
  * Run the full indexing pipeline for a repo. Caller must have called db.initDb().
@@ -116,6 +117,21 @@ export async function doIndexRepo(repoId: string): Promise<void> {
       : { detailed, apiRoutes, apiRoutesByFeature };
     await db.saveReport(repoId, merged);
     console.log("[worker] phase 4 done", { repoId, apiRouteCount: apiRoutes.length });
+
+    console.log("[worker] phase 5: Project Intelligence Report");
+    try {
+      const intelligence = await computeIntelligenceReport(
+        path,
+        files,
+        apiRoutes,
+        merged,
+        { openai, qdrant, repoId }
+      );
+      await db.saveReport(repoId, { ...merged, intelligence });
+      console.log("[worker] phase 5 done", { repoId, totalScore: intelligence.totalScore });
+    } catch (intErr) {
+      console.warn("[worker] phase 5 (intelligence) failed, report saved without intelligence", intErr);
+    }
   } catch (err) {
     console.error("[worker] failed", repoId, err);
     const message = err instanceof Error ? err.message : "Indexing failed.";

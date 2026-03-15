@@ -4,13 +4,10 @@ import {
   AppShell,
   Container,
   Title,
-  Card,
   Badge,
-  Progress,
   Tabs,
   Alert,
   Anchor,
-  Stack,
   Text,
   Group,
   Loader,
@@ -23,6 +20,7 @@ import { Chat } from "../../../components/Chat";
 import { ReportView } from "../../../components/ReportView";
 import { ApisView } from "../../../components/ApisView";
 import { DetailedReportView } from "../../../components/DetailedReportView";
+import { IntelligenceView } from "../../../components/IntelligenceView";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -45,7 +43,7 @@ function useRepo(id: string | undefined) {
     },
     enabled: !!id,
     refetchInterval: (query) =>
-      query.state.data?.status === "indexing" ? 2500 : false,
+      query.state.data?.status === "indexing" ? 4000 : false,
   });
 }
 
@@ -120,7 +118,6 @@ export default function RepoPage() {
 
   const isIndexing = repo.status === "indexing";
   const isReady = repo.status === "ready";
-  const isFailed = repo.status === "failed";
 
   return (
     <AppShell header={{ height: 64 }} padding="md">
@@ -150,44 +147,7 @@ export default function RepoPage() {
         </Group>
       </AppShell.Header>
       <AppShell.Main>
-        <Container size="lg" py="xl">
-          <Card
-            className="archai-glass"
-            p="lg"
-            mb="xl"
-            radius="md"
-            style={{ padding: 24 }}
-          >
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Text size="sm" fw={600} c="dimmed">
-                  Status
-                </Text>
-                <StatusBadge status={repo.status} />
-              </Group>
-              {isIndexing && (
-                <Progress
-                  value={repo.files_processed ? 50 : 10}
-                  size="sm"
-                  radius="xl"
-                  animated
-                  color="violet"
-                  style={{ background: "rgba(255,255,255,0.08)" }}
-                />
-              )}
-              {isFailed && repo.error_message && (
-                <Alert color="red" variant="light" radius="md">
-                  {repo.error_message}
-                </Alert>
-              )}
-              {repo.files_processed > 0 && (
-                <Text size="sm" c="dimmed">
-                  Files processed: {repo.files_processed}
-                </Text>
-              )}
-            </Stack>
-          </Card>
-
+        <Container size="lg" py="xl" pt={0}>
           <Tabs
             defaultValue="report"
             classNames={{
@@ -198,22 +158,22 @@ export default function RepoPage() {
               panel: { paddingTop: 24 },
             }}
           >
-            <Tabs.List grow style={{ maxWidth: 560 }}>
+            <Tabs.List grow style={{ maxWidth: 640 }}>
               <Tabs.Tab value="report">Report</Tabs.Tab>
+              <Tabs.Tab value="intelligence">Effort Analysis</Tabs.Tab>
               <Tabs.Tab value="apis">APIs</Tabs.Tab>
-              <Tabs.Tab value="detailed">Detailed</Tabs.Tab>
               <Tabs.Tab value="chat">Chat</Tabs.Tab>
+              <Tabs.Tab value="detailed">Detailed</Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="report">
-              {isReady ? (
-                <ReportView repoId={id} />
-              ) : (
-                <Alert color="violet" variant="light" radius="md">
-                  {isIndexing
-                    ? "Indexing in progress. Report will be available when ready."
-                    : "Complete indexing to see the report."}
-                </Alert>
-              )}
+              <ReportView
+                repoId={id}
+                repoStatus={{
+                  status: repo.status,
+                  files_processed: repo.files_processed,
+                  error_message: repo.error_message,
+                }}
+              />
             </Tabs.Panel>
             <Tabs.Panel value="apis">
               {isReady ? (
@@ -234,6 +194,17 @@ export default function RepoPage() {
                   {isIndexing
                     ? "Indexing in progress. Detailed analysis will be available when ready."
                     : "Complete indexing to see the detailed analysis."}
+                </Alert>
+              )}
+            </Tabs.Panel>
+            <Tabs.Panel value="intelligence">
+              {isReady ? (
+                <IntelligenceView repoId={id} />
+              ) : (
+                <Alert color="violet" variant="light" radius="md">
+                  {isIndexing
+                    ? "Indexing in progress. Intelligence report will be available when ready."
+                    : "Complete indexing to see the Project Intelligence report."}
                 </Alert>
               )}
             </Tabs.Panel>

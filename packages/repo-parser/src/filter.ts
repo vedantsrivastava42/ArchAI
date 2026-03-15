@@ -1,5 +1,7 @@
 /**
  * Ignore list and allowlist of extensions. Enforce max files per repo.
+ * DevOps-related files (.env.example, Dockerfile, docker-compose, .yml) are allowed
+ * so they appear in the file list for intelligence and other consumers.
  */
 
 const IGNORE_SEGMENTS = new Set([
@@ -29,6 +31,22 @@ const IGNORE_NAMES = new Set([
   "poetry.lock",
 ]);
 
+/** Env config files we allow so DevOps/intelligence can see them. */
+const ALLOWED_ENV_NAMES = new Set([".env.example", ".env.sample", "env.example"]);
+
+/** No-extension or special filenames used for DevOps (Dockerfile, CI, etc.). */
+const ALLOWED_DEVOPS_NAMES = new Set([
+  "dockerfile",
+  "jenkinsfile",
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yml",
+  "compose.yaml",
+  ".gitlab-ci.yml",
+  ".gitlab-ci.yaml",
+  "azure-pipelines.yml",
+]);
+
 const ALLOWED_EXTENSIONS = new Set([
   ".ts",
   ".tsx",
@@ -38,6 +56,10 @@ const ALLOWED_EXTENSIONS = new Set([
   ".py",
   ".go",
   ".rb",
+  ".yml",
+  ".yaml",
+  ".example",
+  ".sample",
 ]);
 
 export const MAX_FILES_PER_REPO = 2000;
@@ -45,16 +67,26 @@ export const MAX_FILES_PER_REPO = 2000;
 export function isAllowedExtension(path: string): boolean {
   const lower = path.toLowerCase();
   const ext = lower.includes(".") ? lower.slice(lower.lastIndexOf(".")) : "";
-  return ALLOWED_EXTENSIONS.has(ext);
+  if (ALLOWED_EXTENSIONS.has(ext)) return true;
+  const basename = path.split(/[/\\]/).pop()?.toLowerCase() ?? "";
+  if (ALLOWED_DEVOPS_NAMES.has(basename)) return true;
+  if (basename === "dockerfile" || basename.startsWith("dockerfile.")) return true;
+  return false;
 }
 
 export function shouldIgnorePath(relativePath: string): boolean {
+  const lower = relativePath.toLowerCase();
+  const basename = relativePath.split(/[/\\]/).pop() ?? "";
+  const basenameLower = basename.toLowerCase();
+  if (ALLOWED_ENV_NAMES.has(basenameLower)) return false;
+  if (ALLOWED_DEVOPS_NAMES.has(basenameLower)) return false;
+  if (basenameLower === "dockerfile" || basenameLower.startsWith("dockerfile.")) return false;
+
   const parts = relativePath.split(/[/\\]/);
   for (const part of parts) {
     if (IGNORE_SEGMENTS.has(part)) return true;
     if (IGNORE_NAMES.has(part)) return true;
   }
-  const lower = relativePath.toLowerCase();
   if (lower.endsWith(".env") || lower.includes(".env.")) return true;
   const ext = lower.includes(".") ? lower.slice(lower.lastIndexOf(".")) : "";
   if (IGNORE_EXTENSIONS.has(ext)) return true;
