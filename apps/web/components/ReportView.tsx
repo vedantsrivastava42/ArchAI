@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Stack,
   Title,
@@ -12,7 +12,6 @@ import {
   ThemeIcon,
   Box,
   Badge,
-  Progress,
   Alert,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
@@ -180,7 +179,10 @@ interface ReportViewProps {
 }
 
 export function ReportView({ repoId, repoStatus }: ReportViewProps) {
-  const { data: report, isLoading, error } = useQuery({
+  const isIndexing = repoStatus?.status === "indexing";
+  const isReady = repoStatus?.status === "ready";
+
+  const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ["report", repoId],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/repos/${repoId}/report`);
@@ -190,14 +192,36 @@ export function ReportView({ repoId, repoStatus }: ReportViewProps) {
     enabled: !!repoId,
   });
 
+  // When indexing finishes, refetch report so we show latest (including effort analysis) without refresh
+  useEffect(() => {
+    if (isReady) refetch();
+  }, [isReady, refetch]);
+
+  // While indexing: show only a loader until all 5 phases complete
+  if (repoStatus != null && isIndexing) {
+    return (
+      <Stack gap="md" align="center" justify="center" style={{ minHeight: 280, padding: 48 }}>
+        <Loader size="lg" color="violet" />
+        <Text size="sm" c="dimmed">
+          Preparing your report…
+        </Text>
+        {repoStatus.files_processed > 0 && (
+          <Text size="xs" c="dimmed">
+            Files processed: {repoStatus.files_processed}
+          </Text>
+        )}
+      </Stack>
+    );
+  }
+
   if (isLoading) {
     return (
-      <Group gap="sm">
-        <Loader size="sm" color="violet" />
+      <Stack gap="md" align="center" justify="center" style={{ minHeight: 280, padding: 48 }}>
+        <Loader size="lg" color="violet" />
         <Text size="sm" c="dimmed">
           Loading report…
         </Text>
-      </Group>
+      </Stack>
     );
   }
 
@@ -231,14 +255,12 @@ export function ReportView({ repoId, repoStatus }: ReportViewProps) {
     !report.features?.length;
 
   const intel = report.intelligence;
-  const isReady = repoStatus?.status === "ready";
-  const isIndexing = repoStatus?.status === "indexing";
   const isFailed = repoStatus?.status === "failed";
   const showReportContent = repoStatus == null || isReady;
 
   return (
     <Stack gap="xl" style={{ marginTop: 40 }}>
-      {repoStatus != null && (
+      {repoStatus != null && isReady && (
         <Card
           className="archai-glass"
           p="lg"
@@ -252,16 +274,6 @@ export function ReportView({ repoId, repoStatus }: ReportViewProps) {
               </Text>
               <StatusBadge status={repoStatus.status} />
             </Group>
-            {isIndexing && (
-              <Progress
-                value={repoStatus.files_processed ? 50 : 10}
-                size="sm"
-                radius="xl"
-                animated
-                color="violet"
-                style={{ background: "rgba(255,255,255,0.08)" }}
-              />
-            )}
             {isFailed && repoStatus.error_message && (
               <Alert color="red" variant="light" radius="md">
                 {repoStatus.error_message}
@@ -275,11 +287,9 @@ export function ReportView({ repoId, repoStatus }: ReportViewProps) {
           </Stack>
         </Card>
       )}
-      {repoStatus != null && !isReady && (
+      {repoStatus != null && !isReady && !isIndexing && (
         <Alert color="violet" variant="light" radius="md">
-          {isIndexing
-            ? "Indexing in progress. Report will be available when ready."
-            : "Complete indexing to see the report."}
+          Complete indexing to see the report.
         </Alert>
       )}
       {showReportContent && (

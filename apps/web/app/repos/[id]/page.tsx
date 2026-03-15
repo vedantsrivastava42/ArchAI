@@ -43,7 +43,7 @@ function useRepo(id: string | undefined) {
     },
     enabled: !!id,
     refetchInterval: (query) =>
-      query.state.data?.status === "indexing" ? 2500 : false,
+      query.state.data?.status === "indexing" ? 4000 : false,
   });
 }
 

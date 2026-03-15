@@ -15,12 +15,27 @@ const DOCKER_COMPOSE_NAMES = [
   "compose.yaml",
 ];
 
-/** Dockerfile at repo root or anywhere in the codebase (e.g. backend/Dockerfile, frontend/Dockerfile). */
+/** Dockerfile at repo root or anywhere in the codebase (e.g. backend/Dockerfile, Dockerfile.dev). */
 function hasDockerfile(basePath: string, files: string[]): boolean {
   if (existsSync(join(basePath, "Dockerfile"))) return true;
-  return files.some(
-    (f) => f.replace(/\\/g, "/").split("/").pop()?.toLowerCase() === "dockerfile"
-  );
+  if (existsSync(join(basePath, "dockerfile"))) return true;
+  try {
+    const rootEntries = readdirSync(basePath, { withFileTypes: true });
+    if (
+      rootEntries.some(
+        (e) =>
+          e.isFile() &&
+          e.name.toLowerCase().startsWith("dockerfile")
+      )
+    )
+      return true;
+  } catch {
+    // ignore
+  }
+  return files.some((f) => {
+    const name = f.replace(/\\/g, "/").split("/").pop()?.toLowerCase() ?? "";
+    return name === "dockerfile" || name.startsWith("dockerfile.");
+  });
 }
 
 function hasDockerCompose(basePath: string): boolean {

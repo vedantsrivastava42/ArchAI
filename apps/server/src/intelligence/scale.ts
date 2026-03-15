@@ -51,7 +51,7 @@ function hasMultiLayerArchitecture(files: string[]): boolean {
     for (let i = 0; i < layerPatterns.length; i++) {
       if (layerPatterns[i].test(norm)) foundLayers.add(i);
     }
-    if (foundLayers.size >= 5) return true;
+    if (foundLayers.size >= 4) return true;
   }
   return false;
 }

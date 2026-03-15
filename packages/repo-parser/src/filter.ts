@@ -69,7 +69,9 @@ export function isAllowedExtension(path: string): boolean {
   const ext = lower.includes(".") ? lower.slice(lower.lastIndexOf(".")) : "";
   if (ALLOWED_EXTENSIONS.has(ext)) return true;
   const basename = path.split(/[/\\]/).pop()?.toLowerCase() ?? "";
-  return ALLOWED_DEVOPS_NAMES.has(basename);
+  if (ALLOWED_DEVOPS_NAMES.has(basename)) return true;
+  if (basename === "dockerfile" || basename.startsWith("dockerfile.")) return true;
+  return false;
 }
 
 export function shouldIgnorePath(relativePath: string): boolean {
@@ -78,6 +80,7 @@ export function shouldIgnorePath(relativePath: string): boolean {
   const basenameLower = basename.toLowerCase();
   if (ALLOWED_ENV_NAMES.has(basenameLower)) return false;
   if (ALLOWED_DEVOPS_NAMES.has(basenameLower)) return false;
+  if (basenameLower === "dockerfile" || basenameLower.startsWith("dockerfile.")) return false;
 
   const parts = relativePath.split(/[/\\]/);
   for (const part of parts) {

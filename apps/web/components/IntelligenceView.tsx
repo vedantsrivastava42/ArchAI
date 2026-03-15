@@ -219,7 +219,7 @@ export function ScoreCircle({ score, max, tier }: { score: number; max: number; 
         c="red"
         style={{ width: "100%", textAlign: "left", lineHeight: 1.4 }}
       >
-        Note: The score reflects detectable engineering signals in the repository and should be interpreted as an indicative assessment rather than an exact measure of effort.
+        Note: The score reflects detectable engineering signals in the repository and should be interpreted as an indicative assessment rather than an exact measure of effort. It is more accurate for full stack web development projects.
       </Text>
     </Stack>
   );
