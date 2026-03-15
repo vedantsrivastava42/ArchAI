@@ -10,11 +10,14 @@ import {
   Badge,
   Loader,
   List,
+  Transition,
+  Text,
 } from "@mantine/core";
 import { CodeHighlight } from "@mantine/code-highlight";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import type { ChatResponse } from "@archai/types";
+import { MarkdownContent } from "./MarkdownContent";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -65,70 +68,99 @@ export function Chat({ repoId }: ChatProps) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [history]);
 
+  const handleSend = () => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    setMessage("");
+    send.mutate(trimmed);
+  };
+
   return (
-    <Stack gap="md">
-      <ScrollArea viewportRef={scrollRef} h={400} type="auto">
+    <div className="archai-chat" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <Stack gap="md" style={{ flex: 1, minHeight: 0 }}>
+      <ScrollArea viewportRef={scrollRef} h={400} type="auto" style={{ flex: "1 1 auto" }}>
         <Stack gap="sm">
           {history.length === 0 && (
-            <Paper p="md" withBorder>
+            <Paper className="archai-glass" p="lg" radius="md" style={{ padding: 24 }}>
               <Stack gap="xs">
-                <Badge variant="light">Tip</Badge>
-                Ask about the codebase: &quot;Where is X defined?&quot;, &quot;How does Y work?&quot; Or ask for an overview: &quot;What does this project do?&quot;
+                <Badge variant="light" color="violet">Tip</Badge>
+                <Text size="sm" c="dimmed" style={{ lineHeight: 1.6 }}>
+                  Ask about the codebase: &quot;Where is X defined?&quot;, &quot;How does Y work?&quot; Or ask for an overview: &quot;What does this project do?&quot;
+                </Text>
               </Stack>
             </Paper>
           )}
           {history.map((m, i) => (
-            <Paper
-              key={i}
-              p="md"
-              withBorder
-              style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "90%",
-              }}
-            >
-              <Stack gap="xs">
-                <Badge size="sm" color={m.role === "user" ? "blue" : "gray"}>
-                  {m.role}
-                </Badge>
+            <Transition key={i} mounted={true} transition="fade" duration={220}>
+              {(styles) => (
+                <Paper
+                  className="archai-glass"
+                  p="lg"
+                  radius="md"
+                  style={{
+                    ...styles,
+                    alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                    maxWidth: "90%",
+                    minWidth: 0,
+                    padding: 20,
+                    borderLeftWidth: 3,
+                    borderLeftColor: m.role === "user" ? "var(--mantine-color-violet-6)" : "rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <Stack gap="xs">
+                    <Badge size="sm" color={m.role === "user" ? "violet" : "gray"} variant="light">
+                      {m.role}
+                    </Badge>
                 {m.overview?.length ? (
-                  <MessageContent content={m.content} overview={m.overview} />
-                ) : (
-                  <MessageContent content={m.content} />
-                )}
-              </Stack>
-            </Paper>
+                      <MessageContent content={m.content} overview={m.overview} />
+                    ) : (
+                      <MessageContent content={m.content} />
+                    )}
+                  </Stack>
+                </Paper>
+              )}
+            </Transition>
           ))}
           {send.isPending && (
-            <Paper p="md" withBorder>
-              <Group>
-                <Loader size="sm" />
-                <span>Thinking…</span>
-              </Group>
-            </Paper>
+            <Transition mounted={send.isPending} transition="fade" duration={180}>
+              {(styles) => (
+                <Paper className="archai-glass" p="md" radius="md" style={styles}>
+                  <Group gap="sm">
+                    <Loader size="sm" color="violet" />
+                    <span>Thinking…</span>
+                  </Group>
+                </Paper>
+              )}
+            </Transition>
           )}
         </Stack>
       </ScrollArea>
-      <Group align="flex-end" wrap="nowrap">
+      <Group align="flex-end" wrap="nowrap" gap="sm" style={{ minWidth: 0 }}>
         <Textarea
           placeholder="Ask about the codebase…"
           value={message}
           onChange={(e) => setMessage(e.currentTarget.value)}
           minRows={1}
           maxRows={4}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: 0 }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (message.trim()) send.mutate(message.trim());
+              handleSend();
             }
           }}
         />
-        <Button onClick={() => message.trim() && send.mutate(message.trim())} loading={send.isPending}>
+        <Button
+          color="violet"
+          onClick={handleSend}
+          loading={send.isPending}
+          className="archai-btn-glow"
+        >
           Send
         </Button>
       </Group>
     </Stack>
+    </div>
   );
 }
 
@@ -153,10 +185,12 @@ function MessageContent({ content, overview }: { content: string; overview?: str
           const lang = match?.[1] ?? "";
           const code = match?.[2] ?? part.slice(3, -3);
           return (
-            <CodeHighlight key={i} code={code} language={lang || "text"} withCopyButton />
+            <div key={i} style={{ maxWidth: "100%", overflowX: "auto", minWidth: 0 }}>
+              <CodeHighlight code={code} language={lang || "text"} withCopyButton />
+            </div>
           );
         }
-        return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
+        return <MarkdownContent key={i} content={part} size="sm" />;
       })}
     </>
   );

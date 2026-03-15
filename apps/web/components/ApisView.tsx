@@ -1,7 +1,19 @@
 "use client";
 
-import { Stack, Title, Text, Table, Loader, Group, Paper } from "@mantine/core";
+import {
+  Stack,
+  Title,
+  Text,
+  Loader,
+  Group,
+  Card,
+  Badge,
+  Grid,
+  ThemeIcon,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import { IconPlug, IconFileAnalytics } from "@tabler/icons-react";
+import { MarkdownContent } from "./MarkdownContent";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -19,6 +31,48 @@ interface ApisViewProps {
   repoId: string;
 }
 
+function methodColor(method: string): string {
+  const m = method.toUpperCase();
+  if (m === "GET") return "blue";
+  if (m === "POST") return "violet";
+  if (m === "PUT" || m === "PATCH") return "yellow";
+  if (m === "DELETE") return "red";
+  return "gray";
+}
+
+function ApiEndpointCard({ method, path }: { method: string; path: string }) {
+  return (
+    <Card
+      className="archai-glass"
+      p="md"
+      radius="md"
+      style={{ padding: 20 }}
+    >
+      <Group gap="sm" wrap="nowrap" align="flex-start">
+        <Badge
+          size="sm"
+          variant="light"
+          color={methodColor(method)}
+          style={{ flexShrink: 0, textTransform: "uppercase" }}
+        >
+          {method}
+        </Badge>
+        <Text
+          ff="monospace"
+          size="sm"
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {path}
+        </Text>
+      </Group>
+    </Card>
+  );
+}
+
 export function ApisView({ repoId }: ApisViewProps) {
   const { data: report, isLoading, error } = useQuery({
     queryKey: ["report", repoId],
@@ -32,55 +86,81 @@ export function ApisView({ repoId }: ApisViewProps) {
 
   if (isLoading) {
     return (
-      <Group>
-        <Loader size="sm" />
-        <Text size="sm" c="dimmed">Loading APIs…</Text>
+      <Group gap="sm">
+        <Loader size="sm" color="violet" />
+        <Text size="sm" c="dimmed">
+          Loading APIs…
+        </Text>
       </Group>
     );
   }
 
   if (error || !report) {
     return (
-      <Text size="sm" c="dimmed">No report available. It may still be generating after indexing.</Text>
+      <Text size="sm" c="dimmed">
+        No report available. It may still be generating after indexing.
+      </Text>
     );
   }
 
   const routes = report.apiRoutes ?? [];
-  const count = routes.length;
   const apiSurfaceText = report.detailed?.apiSurface?.trim();
 
   return (
-    <Stack gap="lg">
-      <Paper p="md" withBorder>
-        <Title order={5} mb="sm">API routes</Title>
-        <Text size="sm" c="dimmed" mb="md">Total: {count} route{count !== 1 ? "s" : ""}</Text>
-        {count === 0 ? (
-          <Text size="sm" c="dimmed">No API routes detected. The repo may not expose HTTP routes, or they use a pattern we don&apos;t extract yet.</Text>
-        ) : (
-          <Table striped withTableBorder withColumnBorders>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Method</Table.Th>
-                <Table.Th>Path</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
+    <Stack gap="xl" style={{ marginTop: 40 }}>
+      <Card
+        className="archai-glass"
+        p="lg"
+        radius="md"
+        style={{ padding: 24 }}
+      >
+        <Stack gap="md">
+          <Group gap="sm">
+            <ThemeIcon size="lg" radius="md" variant="light" color="blue">
+              <IconPlug size={20} />
+            </ThemeIcon>
+            <div>
+              <Title order={4}>API routes</Title>
+              <Text size="sm" c="dimmed">
+                {routes.length} route{routes.length !== 1 ? "s" : ""} detected
+              </Text>
+            </div>
+          </Group>
+          {routes.length === 0 ? (
+            <Text size="sm" c="dimmed">
+              No API routes detected. The repo may not expose HTTP routes, or they
+              use a pattern we don&apos;t extract yet.
+            </Text>
+          ) : (
+            <Grid gutter="sm">
               {routes.map((r, i) => (
-                <Table.Tr key={i}>
-                  <Table.Td><Text fw={500}>{r.method}</Text></Table.Td>
-                  <Table.Td><Text ff="monospace" size="sm">{r.path}</Text></Table.Td>
-                </Table.Tr>
+                <Grid.Col key={i} span={{ base: 12, sm: 6 }}>
+                  <ApiEndpointCard method={r.method} path={r.path} />
+                </Grid.Col>
               ))}
-            </Table.Tbody>
-          </Table>
-        )}
-      </Paper>
-      {apiSurfaceText ? (
-        <Paper p="md" withBorder>
-          <Title order={5} mb="sm">API Surface (from analysis)</Title>
-          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{apiSurfaceText}</Text>
-        </Paper>
-      ) : null}
+            </Grid>
+          )}
+        </Stack>
+      </Card>
+
+      {apiSurfaceText && (
+        <Card
+          className="archai-glass"
+          p="lg"
+          radius="md"
+          style={{ padding: 24 }}
+        >
+          <Stack gap="md">
+            <Group gap="sm">
+              <ThemeIcon size="lg" radius="md" variant="light" color="violet">
+                <IconFileAnalytics size={20} />
+              </ThemeIcon>
+              <Title order={4}>API Surface (from analysis)</Title>
+            </Group>
+            <MarkdownContent content={apiSurfaceText} size="sm" />
+          </Stack>
+        </Card>
+      )}
     </Stack>
   );
 }
