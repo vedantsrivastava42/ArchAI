@@ -21,7 +21,7 @@ import { extractApiRoutes } from "./api-extractor.js";
 import { cloneAndListFiles, cleanupTempDir } from "@archai/repo-parser";
 import { indexRepo } from "@archai/indexer";
 import { searchChunksHolistic } from "@archai/retriever";
-import { askOpenAI, parseHolisticResponse, parseDetailedReportResponse } from "@archai/llm";
+import { askOpenAI, parseHolisticResponse, parseDetailedReportResponse, categorizeApiRoutes } from "@archai/llm";
 import OpenAI from "openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 
@@ -85,6 +85,15 @@ export async function doIndexRepo(repoId: string): Promise<void> {
 
     console.log("[worker] phase 4: API extraction + detailed report");
     const apiRoutes = await extractApiRoutes(path, files);
+    let apiRoutesByFeature: { feature: string; routes: { method: string; path: string }[] }[] | undefined;
+    if (apiRoutes.length > 0) {
+      try {
+        apiRoutesByFeature = await categorizeApiRoutes(openai, apiRoutes);
+        console.log("[worker] API categorization done", { groupCount: apiRoutesByFeature.length });
+      } catch (err) {
+        console.warn("[worker] API categorization failed, using flat list", err);
+      }
+    }
     const detailedChunks = await searchChunksHolistic(qdrant, openai, repoId, {
       maxChunksReturned: 30,
     });
@@ -102,7 +111,9 @@ export async function doIndexRepo(repoId: string): Promise<void> {
     );
     const detailed = parseDetailedReportResponse(detailedAnswer);
     const existing = await db.getReport(repoId);
-    const merged = existing ? { ...existing, detailed, apiRoutes } : { detailed, apiRoutes };
+    const merged = existing
+      ? { ...existing, detailed, apiRoutes, apiRoutesByFeature }
+      : { detailed, apiRoutes, apiRoutesByFeature };
     await db.saveReport(repoId, merged);
     console.log("[worker] phase 4 done", { repoId, apiRouteCount: apiRoutes.length });
   } catch (err) {

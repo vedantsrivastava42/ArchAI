@@ -22,8 +22,14 @@ interface ApiRoute {
   path: string;
 }
 
+interface ApiRouteGroup {
+  feature: string;
+  routes: ApiRoute[];
+}
+
 interface ReportForApis {
   apiRoutes?: ApiRoute[];
+  apiRoutesByFeature?: ApiRouteGroup[];
   detailed?: { apiSurface?: string };
 }
 
@@ -104,6 +110,11 @@ export function ApisView({ repoId }: ApisViewProps) {
   }
 
   const routes = report.apiRoutes ?? [];
+  const byFeature = report.apiRoutesByFeature ?? [];
+  const useGrouped = byFeature.length > 0;
+  const totalCount = useGrouped
+    ? byFeature.reduce((n, g) => n + g.routes.length, 0)
+    : routes.length;
   const apiSurfaceText = report.detailed?.apiSurface?.trim();
 
   return (
@@ -122,15 +133,33 @@ export function ApisView({ repoId }: ApisViewProps) {
             <div>
               <Title order={4}>API routes</Title>
               <Text size="sm" c="dimmed">
-                {routes.length} route{routes.length !== 1 ? "s" : ""} detected
+                {totalCount} route{totalCount !== 1 ? "s" : ""} detected
+                {useGrouped ? ` in ${byFeature.length} categor${byFeature.length !== 1 ? "ies" : "y"}` : ""}
               </Text>
             </div>
           </Group>
-          {routes.length === 0 ? (
+          {totalCount === 0 ? (
             <Text size="sm" c="dimmed">
               No API routes detected. The repo may not expose HTTP routes, or they
               use a pattern we don&apos;t extract yet.
             </Text>
+          ) : useGrouped ? (
+            <Stack gap="lg">
+              {byFeature.map((group, gi) => (
+                <Stack key={gi} gap="xs">
+                  <Title order={5} c="dimmed" style={{ textTransform: "capitalize" }}>
+                    {group.feature}
+                  </Title>
+                  <Grid gutter="sm">
+                    {group.routes.map((r, i) => (
+                      <Grid.Col key={i} span={{ base: 12, sm: 6 }}>
+                        <ApiEndpointCard method={r.method} path={r.path} />
+                      </Grid.Col>
+                    ))}
+                  </Grid>
+                </Stack>
+              ))}
+            </Stack>
           ) : (
             <Grid gutter="sm">
               {routes.map((r, i) => (
