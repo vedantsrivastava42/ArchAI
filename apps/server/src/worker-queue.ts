@@ -15,19 +15,14 @@ config();
 
 import { Worker, type Job } from "bullmq";
 import * as db from "./db.js";
+import { getRedisConnectionOptions } from "./queue.js";
 import { doIndexRepo } from "./worker.js";
 
-const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-
-function parseRedisUrl(url: string): { host: string; port: number } {
-  try {
-    const u = new URL(url);
-    return { host: u.hostname || "localhost", port: u.port ? parseInt(u.port, 10) : 6379 };
-  } catch {
-    return { host: "localhost", port: 6379 };
-  }
+const REDIS_URL = process.env.REDIS_URL;
+if (!REDIS_URL) {
+  console.error("[worker-queue] REDIS_URL is required (e.g. Upstash: rediss://default:TOKEN@xxx.upstash.io:6379)");
+  process.exit(1);
 }
-
 const concurrency = Math.min(4, Math.max(2, parseInt(process.env.INDEX_WORKER_CONCURRENCY ?? "4", 10) || 4));
 
 async function main(): Promise<void> {
@@ -39,7 +34,7 @@ async function main(): Promise<void> {
 
   await db.initDb();
 
-  const connection = { ...parseRedisUrl(REDIS_URL), maxRetriesPerRequest: null as number | null };
+  const connection = getRedisConnectionOptions(null);
 
   const worker = new Worker<{ repoId: string }>(
     "repoIndex",

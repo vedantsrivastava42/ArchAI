@@ -71,7 +71,15 @@ async function main() {
   }
 
   const app = express();
-  app.use(cors({ origin: true })); // allow frontend (any origin in dev)
+  // Production: set CORS_ORIGIN to your frontend URL (e.g. https://your-app.vercel.app). Dev: omit to allow any origin.
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.use(
+    cors({
+      origin: corsOrigin
+        ? corsOrigin.split(",").map((o) => o.trim())
+        : true,
+    })
+  );
   app.use(express.json());
 
   app.use("/api/repos", createReposRouter(openai, qdrant));
@@ -79,8 +87,10 @@ async function main() {
 
   app.use(errorHandler);
 
-  app.listen(PORT, () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
+  // Listen on 0.0.0.0 so the server accepts connections from the internet (e.g. when deployed on EC2).
+  const host = process.env.HOST ?? "0.0.0.0";
+  app.listen(PORT, host, () => {
+    console.log(`Server listening on http://${host}:${PORT}`);
   });
 }
 
