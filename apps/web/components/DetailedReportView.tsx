@@ -24,8 +24,7 @@ import {
   IconCode,
 } from "@tabler/icons-react";
 import { MarkdownContent } from "./MarkdownContent";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/api";
 
 interface DetailedReport {
   projectOverview?: string;
@@ -70,7 +69,7 @@ export function DetailedReportView({ repoId }: DetailedReportViewProps) {
   const { data: report, isLoading, error } = useQuery({
     queryKey: ["report", repoId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/repos/${repoId}/report`);
+      const res = await apiFetch(`/api/repos/${repoId}/report`);
       if (!res.ok) throw new Error("Failed to load report");
       return res.json() as Promise<ReportForDetailed>;
     },

@@ -18,8 +18,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import type { ChatResponse } from "@archai/types";
 import { MarkdownContent } from "./MarkdownContent";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/api";
 
 interface HistoryEntry {
   role: "user" | "assistant";
@@ -39,7 +38,7 @@ export function Chat({ repoId }: ChatProps) {
 
   const send = useMutation({
     mutationFn: async (text: string) => {
-      const res = await fetch(`${API_BASE}/api/repos/${repoId}/chat`, {
+      const res = await apiFetch(`/api/repos/${repoId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

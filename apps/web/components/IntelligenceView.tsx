@@ -29,8 +29,7 @@ import {
   IconListCheck,
   IconTool,
 } from "@tabler/icons-react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/api";
 
 interface IntelligenceBreakdownItem {
   score: number;
@@ -289,7 +288,7 @@ export function IntelligenceView({ repoId }: IntelligenceViewProps) {
   const { data: report, isLoading, error } = useQuery({
     queryKey: ["report", repoId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/repos/${repoId}/report`);
+      const res = await apiFetch(`/api/repos/${repoId}/report`);
       if (!res.ok) throw new Error("Failed to load report");
       return res.json() as Promise<ReportWithIntelligence>;
     },

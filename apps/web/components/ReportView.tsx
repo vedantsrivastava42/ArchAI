@@ -23,8 +23,7 @@ import {
   IconList,
 } from "@tabler/icons-react";
 import { ScoreCircle } from "./IntelligenceView";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/api";
 
 function StatusBadge({ status }: { status: string }) {
   const isReady = status === "ready";
@@ -185,7 +184,7 @@ export function ReportView({ repoId, repoStatus }: ReportViewProps) {
   const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ["report", repoId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/repos/${repoId}/report`);
+      const res = await apiFetch(`/api/repos/${repoId}/report`);
       if (!res.ok) throw new Error("Failed to load report");
       return res.json() as Promise<RepoReport>;
     },

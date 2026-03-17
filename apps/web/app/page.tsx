@@ -19,8 +19,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { IconArrowRight } from "@tabler/icons-react";
 import { RepoForm } from "../components/RepoForm";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/api";
 
 type RepoItem = {
   id: string;
@@ -36,7 +35,7 @@ function useRepos() {
   return useQuery({
     queryKey: ["repos"],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/repos`);
+      const res = await apiFetch("/api/repos");
       if (!res.ok) throw new Error("Failed to load repos");
       return res.json() as Promise<RepoItem[]>;
     },
@@ -56,7 +55,7 @@ export default function Home() {
 
   const submit = useMutation({
     mutationFn: async (repoUrl: string) => {
-      const res = await fetch(`${API_BASE}/api/repos`, {
+      const res = await apiFetch("/api/repos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: repoUrl }),
@@ -75,7 +74,7 @@ export default function Home() {
 
   const deleteRepo = useMutation({
     mutationFn: async (repoId: string) => {
-      const res = await fetch(`${API_BASE}/api/repos/${repoId}`, {
+      const res = await apiFetch(`/api/repos/${repoId}`, {
         method: "DELETE",
       });
       if (!res.ok) {

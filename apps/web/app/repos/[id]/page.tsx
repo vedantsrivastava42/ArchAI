@@ -21,14 +21,13 @@ import { ReportView } from "../../../components/ReportView";
 import { ApisView } from "../../../components/ApisView";
 import { DetailedReportView } from "../../../components/DetailedReportView";
 import { IntelligenceView } from "../../../components/IntelligenceView";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../../../lib/api";
 
 function useRepo(id: string | undefined) {
   return useQuery({
     queryKey: ["repo", id],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/repos/${id}`);
+      const res = await apiFetch(`/api/repos/${id}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Not found");
