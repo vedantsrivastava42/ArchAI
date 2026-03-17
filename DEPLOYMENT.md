@@ -90,7 +90,7 @@ If you run Qdrant on the same EC2 (e.g. aarch64):
 
 - **Root directory**: `apps/web`.
 - **Install**: `cd ../.. && npm ci`.
-- **Build**: default `next build`.
+- **Build**: override with `npm run build:vercel` (builds `@archai/types` then Next.js; required because the app depends on that workspace package).
 - **Env**: `NEXT_PUBLIC_API_URL` = EC2 API URL (e.g. `http://<EC2_IP>:3001` or `https://api.yourdomain.com`).
 
 Redeploy after changing env so the client gets the new API URL.
