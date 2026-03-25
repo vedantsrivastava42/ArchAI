@@ -8,8 +8,8 @@
   "type": "module",
   "scripts": {
     "build": "npm run build -w @archai/types --prefix ../.. && next build",
-    "dev": "next dev",
-    "start": "next start",
+    "dev": "next dev -p 4000",
+    "start": "next start -p 4000",
     "lint": "next lint"
   },
   "dependencies": {
